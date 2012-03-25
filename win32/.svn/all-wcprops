@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/ntop/!svn/ver/4236/trunk/n2n/n2n_v2/win32
+END
+getopt.c
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/win32/getopt.c
+END
+wintap.c
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/win32/wintap.c
+END
+getopt1.c
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/win32/getopt1.c
+END
+n2n_win32.h
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/ntop/!svn/ver/4048/trunk/n2n/n2n_v2/win32/n2n_win32.h
+END
+getopt.h
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/win32/getopt.h
+END
+wintap.h
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/win32/wintap.h
+END
+version-msvc.c
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/win32/version-msvc.c
+END
+CMakeLists.txt
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/ntop/!svn/ver/4236/trunk/n2n/n2n_v2/win32/CMakeLists.txt
+END

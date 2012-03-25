@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/scripts
+END
+mk_SRPM.sh
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/scripts/mk_SRPM.sh
+END
+mk_tar.sh
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/scripts/mk_tar.sh
+END
+mk_deb.sh
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/scripts/mk_deb.sh
+END

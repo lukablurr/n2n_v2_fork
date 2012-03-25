@@ -1,0 +1,89 @@
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/ntop/!svn/ver/4346/trunk/n2n/n2n_v2/debian
+END
+control
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/control
+END
+n2n-edge.init
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/ntop/!svn/ver/4346/trunk/n2n/n2n_v2/debian/n2n-edge.init
+END
+n2n-supernode.init
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/ntop/!svn/ver/4346/trunk/n2n/n2n_v2/debian/n2n-supernode.init
+END
+n2n-edge.default
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/ntop/!svn/ver/4231/trunk/n2n/n2n_v2/debian/n2n-edge.default
+END
+compat
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/debian/compat
+END
+n2n-edge.install
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/n2n-edge.install
+END
+n2n-supernode.install
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/n2n-supernode.install
+END
+n2n-edge.docs
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/n2n-edge.docs
+END
+changelog
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/ntop/!svn/ver/4231/trunk/n2n/n2n_v2/debian/changelog
+END
+copyright
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/debian/copyright
+END
+n2n-edge.manpages
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/n2n-edge.manpages
+END
+n2n-supernode.manpages
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/n2n-supernode.manpages
+END
+rules
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/ntop/!svn/ver/4230/trunk/n2n/n2n_v2/debian/rules
+END
+README.Debian
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/ntop/!svn/ver/4003/trunk/n2n/n2n_v2/debian/README.Debian
+END
