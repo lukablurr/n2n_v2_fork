@@ -40,6 +40,7 @@
 #define _DARWIN_
 #endif
 
+#define N2N_MULTIPLE_SUPERNODES 1
 
 /* Some capability defaults which can be reset for particular platforms. */
 #define N2N_HAVE_DAEMON 1
