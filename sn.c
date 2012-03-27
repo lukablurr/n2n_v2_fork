@@ -10,6 +10,9 @@
 
 #include "n2n.h"
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+#include "sn_multiple.h"
+#endif
 
 #define N2N_SN_LPORT_DEFAULT 7654
 #define N2N_SN_PKTBUF_SIZE   2048
@@ -38,6 +41,11 @@ struct n2n_sn
     uint16_t            lport;          /* Local UDP port to bind to. */
     int                 sock;           /* Main socket for UDP traffic with edges. */
     int                 mgmt_sock;      /* management socket. */
+#ifdef N2N_MULTIPLE_SUPERNODES
+    int                 sn_sock;        /* multiple supernodes socket */
+    struct sn_info *    supernodes;
+    struct comm_info *  communities;
+#endif
     struct peer_info *  edges;          /* Link list of registered edges. */
 };
 
@@ -371,6 +379,16 @@ static int process_mgmt( n2n_sn_t * sss,
     return 0;
 }
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+static int process_sn_msg( n2n_sn_t *sss,
+                           const struct sockaddr_in *sender_sock,
+                           const uint8_t *msg_buf,
+                           size_t msg_size,
+                           time_t now)
+{
+    return 0;
+}
+#endif
 
 /** Examine a datagram and determine what to do with it.
  *
@@ -585,6 +603,10 @@ static int process_udp( n2n_sn_t * sss,
 
         update_edge( sss, reg.edgeMac, cmn.community, &(ack.sock), now );
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+        update_communities( sss->communities, cmn.community );
+#endif
+
         encode_REGISTER_SUPER_ACK( ackbuf, &encx, &cmn2, &ack );
 
         sendto( sss->sock, ackbuf, encx, 0, 
@@ -695,6 +717,19 @@ int main( int argc, char * const argv[] )
         traceEvent( TRACE_NORMAL, "supernode is listening on UDP %u (management)", N2N_SN_MGMT_PORT );
     }
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+    sss.sn_sock = open_socket(N2N_SN_COMM_PORT, 1 /* bind ANY */ );
+    if ( -1 == sss.sn_sock )
+    {
+        traceEvent( TRACE_ERROR, "Failed to open supernodes communication socket. %s", strerror(errno) );
+        exit(-2);
+    }
+    else
+    {
+        traceEvent( TRACE_NORMAL, "supernode is listening on UDP %u (supernodes communication)", N2N_SN_MGMT_PORT );
+    }
+#endif /* #ifdef N2N_MULTIPLE_SUPERNODES */
+
     traceEvent(TRACE_NORMAL, "supernode started");
 
     return run_loop(&sss);
@@ -721,6 +756,11 @@ static int run_loop( n2n_sn_t * sss )
 
         FD_ZERO(&socket_mask);
         max_sock = MAX(sss->sock, sss->mgmt_sock);
+
+#ifdef N2N_MULTIPLE_SUPERNODES
+        max_sock = MAX(max_sock, sss->sn_sock);
+        FD_SET(sss->sn_sock, &socket_mask);
+#endif
 
         FD_SET(sss->sock, &socket_mask);
         FD_SET(sss->mgmt_sock, &socket_mask);
@@ -776,6 +816,27 @@ static int run_loop( n2n_sn_t * sss )
                 /* We have a datagram to process */
                 process_mgmt( sss, &sender_sock, pktbuf, bread, now );
             }
+#ifdef N2N_MULTIPLE_SUPERNODES
+            if (FD_ISSET(sss->sn_sock, &socket_mask))//TODO
+            {
+                struct sockaddr_in  sender_sock;
+                size_t              i;
+
+                i = sizeof(sender_sock);
+                bread = recvfrom( sss->sn_sock, pktbuf, N2N_SN_PKTBUF_SIZE, 0/*flags*/,
+                  (struct sockaddr *)&sender_sock, (socklen_t*)&i);
+
+                if ( bread <= 0 )
+                {
+                    traceEvent( TRACE_ERROR, "recvfrom() failed %d errno %d (%s)", bread, errno, strerror(errno) );
+                    keep_running = 0;
+                    break;
+                }
+
+                /* We have a datagram to process */
+                process_sn_msg( sss, &sender_sock, pktbuf, bread, now );
+            }
+#endif
         }
         else
         {
