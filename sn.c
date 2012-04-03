@@ -386,6 +386,54 @@ static int process_sn_msg( n2n_sn_t *sss,
                            size_t msg_size,
                            time_t now)
 {
+    snm_hdr_t           hdr; /* common fields in the packet header */
+    size_t              rem;
+    size_t              idx;
+    size_t              msg_type;
+
+
+    traceEvent( TRACE_DEBUG, "process_sn_msg(%lu)", msg_size );
+
+    rem = msg_size; /* Counts down bytes of packet to protect against buffer overruns. */
+    idx = 0; /* marches through packet header as parts are decoded. */
+    if ( decode_snm_hdr(&hdr, msg_buf, &rem, &idx) < 0 )
+    {
+        traceEvent( TRACE_ERROR, "Failed to decode header" );
+        return -1; /* failed to decode packet */
+    }
+
+    msg_type = hdr.type; /* message type */
+
+    if ( msg_type == SNM_TYPE_REQ_LIST_MSG )
+    {
+        n2n_SNM_REQ_t req;
+        n2n_SNM_RSP_t rsp;
+        uint8_t       encbuf[N2N_SN_PKTBUF_SIZE];
+        size_t        encx = 0;
+
+        decode_SNM_REQ(&req, &hdr, msg_buf, &rem, &idx);
+
+        build_snm_rsp(sss->supernodes, sss->communities, &req, &rsp);
+
+        encode_SNM_RSP(encbuf, &encx, NULL, &rsp);
+    }
+    else if ( msg_type == SNM_TYPE_RSP_LIST_MSG )
+    {
+        n2n_SNM_RSP_t rsp;
+
+        decode_SNM_RSP(&rsp, &hdr, msg_buf, &rem, &idx);
+
+        update_snm_info(&sss->supernodes, &sss->communities, &rsp);
+    }
+    else if ( msg_type == SNM_TYPE_ADV_ME_MSG )
+    {
+        n2n_SNM_ADV_ME_t adv;
+
+        decode_ADVERTISE_ME(&adv, &hdr, msg_buf, &rem, &idx);
+
+        //TODO send advertise to edges
+    }
+
     return 0;
 }
 #endif
@@ -604,7 +652,7 @@ static int process_udp( n2n_sn_t * sss,
         update_edge( sss, reg.edgeMac, cmn.community, &(ack.sock), now );
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-        update_communities( sss->communities, cmn.community );
+        update_communities( &sss->communities, cmn.community );
 #endif
 
         encode_REGISTER_SUPER_ACK( ackbuf, &encx, &cmn2, &ack );
