@@ -70,13 +70,13 @@ test_SNM_MSG_err:
 static void test_REQ_LIST()
 {
     snm_hdr_t      hdr;
-    n2n_REQ_LIST_t req;
+    n2n_SNM_REQ_t  req;
     size_t         size = 0;
 
-    if (test_SNM_MSG(sizeof(n2n_REQ_LIST_t),
+    if (test_SNM_MSG(sizeof(n2n_SNM_REQ_t),
                      &hdr, &req, size,
-                     (enc_func) encode_REQ_LIST,
-                     (dec_func) decode_REQ_LIST))
+                     (enc_func) encode_SNM_REQ,
+                     (dec_func) decode_SNM_REQ))
     {
         traceEvent(TRACE_ERROR, "Error testing n2n_REQ_LIST_t");
     }
@@ -84,13 +84,13 @@ static void test_REQ_LIST()
 static void test_RSP_LIST()
 {
     snm_hdr_t      hdr;
-    n2n_RSP_LIST_t rsp;
+    n2n_SNM_RSP_t  rsp;
     size_t         size = 0;
 
-    if (test_SNM_MSG(sizeof(n2n_RSP_LIST_t),
+    if (test_SNM_MSG(sizeof(n2n_SNM_RSP_t),
                      &hdr, &rsp, size,
-                     (enc_func) encode_RSP_LIST,
-                     (dec_func) decode_RSP_LIST))
+                     (enc_func) encode_SNM_RSP,
+                     (dec_func) decode_SNM_RSP))
     {
         traceEvent(TRACE_ERROR, "Error testing n2n_RSP_LIST_t");
     }
@@ -98,10 +98,10 @@ static void test_RSP_LIST()
 static void test_ADVERTISE_ME()
 {
     snm_hdr_t          hdr;
-    n2n_ADVERTISE_ME_t adv;
+    n2n_SNM_ADV_ME_t   adv;
     size_t             size = 0;
 
-    if (test_SNM_MSG(sizeof(n2n_ADVERTISE_ME_t),
+    if (test_SNM_MSG(sizeof(n2n_SNM_ADV_ME_t),
                      &hdr, &adv, size,
                      (enc_func) encode_ADVERTISE_ME,
                      (dec_func) decode_ADVERTISE_ME))
