@@ -92,3 +92,38 @@ int process_sn_msg( /*n2n_sn_t * sss,*/
 {
     return 0;
 }
+
+void build_snm_rsp(struct sn_info     *supernodes,
+                   struct comm_info   *communities,
+                   n2n_SNM_REQ_t      *req,
+                   n2n_SNM_RSP_t      *rsp)
+{
+
+}
+
+void update_snm_info(struct sn_info    **supernodes,
+                     struct comm_info  **communities,
+                     n2n_SNM_RSP_t      *rsp)
+{
+    int i;
+
+    for (i = 0; i < rsp->sn_num; i++)
+    {
+        struct sn_info *new = calloc(1, sizeof(struct sn_info));//TODO
+
+        memcpy(&new->sn, rsp->sn_ptr + i, sizeof(n2n_sock_t));
+        sn_list_add(supernodes, new);
+    }
+
+    snm_comm_name_t *comm = rsp->comm_ptr;
+
+    for (i = 0; i < rsp->comm_num; i++)
+    {
+        struct comm_info *new = calloc(1, sizeof(struct comm_info));//TODO
+
+        memcpy(&new->community_name, comm->name, comm->size);
+        comm_list_add(communities, new);
+
+        comm = (uint8_t *) comm + sizeof(comm->size) + comm->size * sizeof(uint8_t);
+    }
+}
