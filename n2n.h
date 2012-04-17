@@ -227,7 +227,8 @@ extern char* macaddr_str(macstr_t buf, const n2n_mac_t mac);
 extern int   str2mac( uint8_t * outmac /* 6 bytes */, const char * s );
 extern char * sock_to_cstr( n2n_sock_str_t out,
                             const n2n_sock_t * sock );
-
+extern n2n_sock_t * sock_from_cstr( n2n_sock_t *out,
+                                    const n2n_sock_str_t str );
 extern int sock_equal( const n2n_sock_t * a, 
                        const n2n_sock_t * b );
 
