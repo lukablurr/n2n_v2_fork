@@ -18,6 +18,7 @@ struct sn_info
 {
     struct sn_info     *next;
     n2n_sock_t          sn;
+    //TODO set listening port also
 };
 
 typedef struct sn_list
@@ -34,6 +35,7 @@ void sn_list_add( struct sn_info **list, struct sn_info *new );
 size_t clear_sn_list( struct sn_info **sn_list );
 size_t sn_list_size( const struct sn_info *list );
 void sn_reverse_list( struct sn_info **list );
+struct sn_info *sn_find( struct sn_info *list, n2n_sock_t *sn );
 
 int update_sn_list( sn_list_t *list, n2n_sock_t *sn );
 
@@ -65,12 +67,9 @@ int update_comm_list( comm_list_t       *comm_list,
 
 int update_communities( comm_list_t *communities, n2n_community_t *comm_name );
 
-//int process_sn_msg( /*n2n_sn_t * sss,*/
-  //                  const struct sockaddr_in *sender_sock,
-    //                const uint8_t *udp_buf,
-      //              size_t udp_size/*
-        //            time_t now*/);
-
+/*******************************************************************
+ *                   SNM INFO related functions                    *
+ *******************************************************************/
 int build_snm_info(sn_list_t       *supernodes,
                    comm_list_t     *communities,
                    snm_hdr_t       *req_hdr,
@@ -81,6 +80,13 @@ void clear_snm_info(n2n_SNM_INFO_t *info);
 void process_snm_rsp(sn_list_t        *supernodes,
                      comm_list_t      *communities,
                      n2n_SNM_INFO_t   *snm_info);
+
+/*******************************************************************
+ *                    SNM ADV related functions                    *
+ *******************************************************************/
+int build_snm_adv(int sock, comm_list_t *communities, n2n_SNM_ADV_t *adv);//TODO maybe add hdr also
+void clear_snm_adv(n2n_SNM_ADV_t *adv);
+void process_snm_adv(sn_list_t *supernodes, n2n_SNM_ADV_t *adv);
 
 /*void send_snm_req(int sock, n2n_sock_t *sn);*/
 

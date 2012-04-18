@@ -15,6 +15,7 @@
 int read_sn_list_from_file( const char *filename, struct sn_info **list )
 {
     struct sn_info *sni = NULL;
+    n2n_sock_str_t sockbuf;
 
     FILE *fd = fopen(filename, "r");
     if (!fd)
@@ -47,6 +48,8 @@ int read_sn_list_from_file( const char *filename, struct sn_info **list )
         }
 
         sn_list_add(list, sni);
+
+        traceEvent(TRACE_DEBUG, "Added supernode %s", sock_to_cstr(sockbuf, &sni->sn));
     }
 
     sn_reverse_list(list);
@@ -140,7 +143,7 @@ void sn_reverse_list( struct sn_info **list )
     }
 }
 
-static struct sn_info *find_sn( struct sn_info *list, n2n_sock_t *sn )
+struct sn_info *sn_find( struct sn_info *list, n2n_sock_t *sn )
 {
     while (list)
     {
@@ -155,7 +158,7 @@ static struct sn_info *find_sn( struct sn_info *list, n2n_sock_t *sn )
 
 int update_sn_list( sn_list_t *list, n2n_sock_t *sn )
 {
-    struct sn_info *item = find_sn(list, sn);
+    struct sn_info *item = sn_find(list->list_head, sn);
     if (item)
     {
         return 0;
@@ -173,8 +176,7 @@ int update_sn_list( sn_list_t *list, n2n_sock_t *sn )
     }
     else
     {
-        traceEvent(TRACE_ERROR,
-                "unsupported family type for supernode address");
+        traceEvent(TRACE_ERROR, "unsupported family type for supernode address");
         return -1;
     }
 
@@ -189,7 +191,7 @@ int update_sn_list( sn_list_t *list, n2n_sock_t *sn )
     sn_list_add(&list->list_head, new);
     list->bin_size += item_size;
 
-    return 0;
+    return 1;
 }
 
 /*
@@ -202,7 +204,7 @@ int read_comm_list_from_file( const char *filename, struct comm_info **list )
     FILE *fd = fopen(filename, "r");
     if (!fd)
     {
-        traceEvent(TRACE_ERROR, "couldn't open community file");
+        traceEvent(TRACE_ERROR, "couldn't open community file. %s", strerror(errno));
         return -1;
     }
 
@@ -400,9 +402,32 @@ int update_communities( comm_list_t *communities, n2n_community_t *comm_name )
     return 0;
 }
 
-/*
- *
- */
+static int communities_to_array( uint16_t          *out_size,
+                                 snm_comm_name_t  **out_array,
+                                 struct comm_info  *communities )
+{
+    *out_size = comm_list_size(communities);
+    if (alloc_communities(out_array, *out_size))
+    {
+        traceEvent(TRACE_ERROR, "could not allocate communities array");
+        return -1;
+    }
+
+    snm_comm_name_t *cni = *out_array;
+
+    while (communities)
+    {
+        cni->size = strlen((char *) communities->community_name);
+        memcpy(cni->name, communities->community_name, sizeof(n2n_community_t));
+        communities = communities->next;
+        cni++;
+    }
+    return 0;
+}
+
+/*******************************************************************
+ *                   SNM INFO related functions                    *
+ *******************************************************************/
 
 static int snm_info_add_sn( n2n_SNM_INFO_t *info, struct sn_info *supernodes )
 {
@@ -423,44 +448,12 @@ static int snm_info_add_sn( n2n_SNM_INFO_t *info, struct sn_info *supernodes )
     }
     return 0;
 }
-static int snm_info_add_comm( n2n_SNM_INFO_t *info,
-                              struct comm_info *communities )
+
+static int snm_info_add_comm( n2n_SNM_INFO_t *info, struct comm_info *communities )
 {
-    info->comm_num = comm_list_size(communities);
-    if (alloc_communities(&info->comm_ptr, info->comm_num))
-    {
-        traceEvent(TRACE_ERROR, "could not allocate communities array");
-        return -1;
-    }
-
-    snm_comm_name_t *cni = info->comm_ptr;
-
-    while (communities)
-    {
-        cni->size = strlen((char *) communities->community_name);
-        memcpy(cni->name, communities->community_name, sizeof(n2n_community_t));
-        communities = communities->next;
-        cni++;
-    }
-    return 0;
+    return communities_to_array(&info->comm_num, &info->comm_ptr, communities);
 }
 
-/*
- * BLABLABLA
- */
-
-/*int process_sn_msg( n2n_sn_t * sss,
- const struct sockaddr_in *sender_sock,
- const uint8_t *udp_buf,
- size_t udp_size
- time_t now)
- {
- return 0;
- }*/
-
-/*
- * Response to request
- */
 int build_snm_info( sn_list_t *supernodes, comm_list_t *communities,
                     snm_hdr_t *req_hdr, n2n_SNM_REQ_t *req,
                     n2n_SNM_INFO_t *info )
@@ -503,23 +496,78 @@ void process_snm_rsp( sn_list_t *supernodes, comm_list_t *communities,
 {
     int i;
 
-    int sn_num = sn_list_size(supernodes->list_head);
+    int need_write = 0;
 
     /* Update list of supernodes */
     for (i = 0; i < snm_info->sn_num; i++)
     {
-        update_sn_list(supernodes, &snm_info->sn_ptr[i]);
+        need_write = update_sn_list(supernodes, &snm_info->sn_ptr[i]);
+    }
 
-        if (sn_num != sn_list_size(supernodes->list_head))
-        {
-            /* elements added */
-            write_sn_list_to_file(supernodes->filename, supernodes->list_head);
-        }
+    if (need_write)
+    {
+        /* elements added */
+        write_sn_list_to_file(supernodes->filename, supernodes->list_head);
     }
 
     /* Update list of communities from recvd from a supernode */
     for (i = 0; i < snm_info->comm_num; i++)
     {
         update_comm_list(communities, 1, &snm_info->comm_ptr[i]);
+    }
+}
+
+/*******************************************************************
+ *                    SNM ADV related functions                    *
+ *******************************************************************/
+
+static int snm_adv_add_comm(n2n_SNM_ADV_t *adv, struct comm_info *communities)
+{
+    return communities_to_array(&adv->comm_num, &adv->comm_ptr, communities);
+}
+
+int build_snm_adv(int sock, comm_list_t *communities, n2n_SNM_ADV_t *adv)
+{
+    int retval = 0;
+
+    memset(adv, 0, sizeof(n2n_SNM_ADV_t));
+
+    struct sockaddr addr;
+    unsigned int addrlen = sizeof(struct sockaddr);
+    retval += getsockname(sock, &addr, &addrlen);
+
+    struct sockaddr_in *sa = (struct sockaddr_in *) &addr;
+
+    adv->sn.family = sa->sin_family;
+    memcpy(adv->sn.addr.v4, &sa->sin_addr, sizeof(struct in_addr));
+    adv->sn.port = sa->sin_port;
+
+    retval += snm_adv_add_comm(adv, communities->list_head);
+
+    return retval;
+}
+
+void clear_snm_adv(n2n_SNM_ADV_t *adv)
+{
+    adv->comm_num = 0;
+    free_communities(&adv->comm_ptr);
+}
+
+void process_snm_adv(sn_list_t *supernodes, n2n_SNM_ADV_t *adv)
+{
+    int i;
+
+    /* Add senders address */
+    int need_write = update_sn_list(supernodes, &adv->sn);
+    if (need_write)
+    {
+        /* elements added */
+        write_sn_list_to_file(supernodes->filename, supernodes->list_head);
+    }
+
+    /* Update list of communities from recvd from a supernode */
+    for (i = 0; i < adv->comm_num; i++)
+    {
+        /*update_comm_list(communities, 1, &adv->comm_ptr[i])*/;
     }
 }
