@@ -401,13 +401,13 @@ static int process_mgmt( n2n_sn_t * sss,
 
 #ifdef N2N_MULTIPLE_SUPERNODES
 
-static void send_snm_req( int sock, n2n_sock_t *sn )
+static void send_snm_req(n2n_sn_t *sss, n2n_sock_t *sn)
 {
     uint8_t pktbuf[N2N_PKT_BUF_SIZE];
     size_t idx;
     ssize_t sent;
     n2n_sock_str_t sockbuf;
-    snm_hdr_t hdr = { SNM_TYPE_REQ_LIST_MSG, 0, 0 };
+    snm_hdr_t hdr = { SNM_TYPE_REQ_LIST_MSG, 0, ++sss->seq_num };
     n2n_SNM_REQ_t req = { 0, NULL };
 
     SET_S(hdr.flags);
@@ -418,8 +418,47 @@ static void send_snm_req( int sock, n2n_sock_t *sn )
 
     traceEvent(TRACE_INFO, "send REQ to %s", sock_to_cstr(sockbuf, sn));
 
-    sent = sendto_sock(sock, sn, pktbuf, idx);
+    sent = sendto_sock(sss->sn_sock, sn, pktbuf, idx);
+}
 
+static void send_snm_rsp(n2n_sn_t *sss, const struct sockaddr_in *sender_sock, snm_hdr_t *hdr, n2n_SNM_REQ_t *req)
+{
+    uint8_t pktbuf[N2N_PKT_BUF_SIZE];
+    size_t  idx;
+    snm_hdr_t rsp_hdr = {SNM_TYPE_RSP_LIST_MSG, hdr->flags, hdr->seq_num};
+    n2n_SNM_INFO_t rsp;
+
+    build_snm_info(&sss->supernodes, &sss->communities, hdr, req, &rsp);
+
+    idx = 0;
+    encode_SNM_INFO(pktbuf, &idx, &rsp_hdr, &rsp);
+    clear_snm_info(&rsp);
+
+    int r = sendto(sss->sn_sock, pktbuf, idx, 0/*flags*/,
+                   (struct sockaddr *) sender_sock, sizeof(struct sockaddr_in));
+    if (r <= 0)
+    {
+        traceEvent(TRACE_ERROR, "process_sn_msg : sendto failed. %s", strerror(errno));
+    }
+}
+
+static void send_snm_adv(n2n_sn_t *sss, n2n_sock_t *sn)
+{
+    uint8_t pktbuf[N2N_PKT_BUF_SIZE];
+    size_t idx;
+    ssize_t sent;
+    n2n_sock_str_t sockbuf;
+    snm_hdr_t hdr = { SNM_TYPE_ADV_MSG, 0, ++sss->seq_num };
+    n2n_SNM_ADV_t adv;
+
+    build_snm_adv(sss->sn_sock, &sss->communities, &adv);
+
+    idx = 0;
+    encode_SNM_ADV(pktbuf, &idx, &hdr, &adv);
+
+    traceEvent(TRACE_INFO, "send ADV to %s", sock_to_cstr(sockbuf, sn));
+
+    sent = sendto_sock(sss->sn_sock, sn, pktbuf, idx);
 }
 
 static int process_sn_msg( n2n_sn_t *sss,
@@ -443,26 +482,27 @@ static int process_sn_msg( n2n_sn_t *sss,
         traceEvent(TRACE_ERROR, "Failed to decode header");
         return -1; /* failed to decode packet */
     }
+    log_SNM_hdr(&hdr);
 
     msg_type = hdr.type; /* message type */
 
     if (msg_type == SNM_TYPE_REQ_LIST_MSG)
     {
-        n2n_SNM_REQ_t  req;
-        n2n_SNM_INFO_t rsp;
-        uint8_t        encbuf[N2N_SN_PKTBUF_SIZE];
-        size_t         encx = 0;
-
+        n2n_SNM_REQ_t req;
         decode_SNM_REQ(&req, &hdr, msg_buf, &rem, &idx);
-        build_snm_info(&sss->supernodes, &sss->communities, &hdr, &req, &rsp);
-        encode_SNM_INFO(encbuf, &encx, NULL, &rsp);
-        clear_snm_info(&rsp);
+        log_SNM_REQ(&req);
 
-        int r = sendto(sss->sn_sock, encbuf, encx, 0/*flags*/,
-                       (struct sockaddr *) sender_sock, sizeof(struct sockaddr_in));
-        if (r <= 0)
+        send_snm_rsp(sss, sender_sock, &hdr, &req);
+
+        n2n_sock_t sn;
+        memcpy(&sn, sender_sock, sizeof(struct sockaddr_in));
+        sn.port = htons(sn.port);
+
+        int need_write = update_sn_list(&sss->supernodes, &sn);
+        if (need_write)
         {
-            traceEvent(TRACE_ERROR, "process_sn_msg : sendto failed. %s", strerror(errno));
+            write_sn_list_to_file(sss->supernodes.filename,
+                                  sss->supernodes.list_head);
         }
     }
     else if (msg_type == SNM_TYPE_RSP_LIST_MSG)
@@ -475,13 +515,17 @@ static int process_sn_msg( n2n_sn_t *sss,
 
         n2n_SNM_INFO_t rsp;
         decode_SNM_INFO(&rsp, &hdr, msg_buf, &rem, &idx);
+        log_SNM_INFO(&rsp);
+
         process_snm_rsp(&sss->supernodes, &sss->communities, &rsp);
     }
-    else if (msg_type == SNM_TYPE_ADV_ME_MSG)
+    else if (msg_type == SNM_TYPE_ADV_MSG)
     {
-        /*n2n_SNM_ADV_ME_t adv;
+        n2n_SNM_ADV_t adv;
+        decode_SNM_ADV(&adv, &hdr, msg_buf, &rem, &idx);
+        log_SNM_ADV(&adv);
 
-        decode_ADVERTISE_ME(&adv, &hdr, msg_buf, &rem, &idx);*/
+        process_snm_adv(&sss->supernodes, &adv);
 
         //TODO send advertise to edges
     }
@@ -745,6 +789,10 @@ static int run_loop( n2n_sn_t * sss );
 static const struct option long_options[] = {
   { "foreground",      no_argument,       NULL, 'f' },
   { "local-port",      required_argument, NULL, 'l' },
+#ifdef N2N_MULTIPLE_SUPERNODES
+  { "sn-port",         required_argument, NULL, 's' },
+  { "supernode",       required_argument, NULL, 'i' },
+#endif
   { "help"   ,         no_argument,       NULL, 'h' },
   { "verbose",         no_argument,       NULL, 'v' },
   { NULL,              0,                 NULL,  0  }
@@ -760,7 +808,13 @@ int main( int argc, char * const argv[] )
     {
         int opt;
 
-        while((opt = getopt_long(argc, argv, "fl:vh", long_options, NULL)) != -1) 
+#ifdef N2N_MULTIPLE_SUPERNODES
+        const char *optstring = "fl:s:i:vh";
+#else
+        const char *optstring = "fl:vh";
+#endif
+
+        while((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1)
         {
             switch (opt) 
             {
@@ -778,13 +832,15 @@ int main( int argc, char * const argv[] )
                 break;
 #ifdef N2N_MULTIPLE_SUPERNODES
             case 's':
+                sss.sn_port = atoi(optarg);
+                break;
+            case 'i':
             {
-                n2n_sock_t sn;
                 n2n_sock_str_t sn_str;
-                memcpy(sn_str, optarg, strlen(optarg));
-                sock_from_cstr(&sn, sn_str);
+                strcpy(sn_str, optarg);
 
                 struct sn_info *si = calloc(1, sizeof(struct sn_info));
+                sock_from_cstr(&si->sn, sn_str);
                 sn_list_add(&sss.supernodes.list_head, si);
 
                 break;
@@ -836,19 +892,25 @@ int main( int argc, char * const argv[] )
     if (-1 == read_sn_list_from_file(sss.supernodes.filename,
                                      &sss.supernodes.list_head))
     {
-        traceEvent(TRACE_ERROR, "Failed to open supernodes file. %s", strerror(errno));
-        exit(-2);
+        if (errno != ENOENT)
+        {
+            traceEvent(TRACE_ERROR, "Failed to open supernodes file. %s", strerror(errno));
+            exit(-2);
+        }
     }
 
     sprintf(sss.communities.filename, "COMM_%d", sss.sn_port);
     if (-1 == read_comm_list_from_file(sss.communities.filename,
                                        &sss.communities.list_head))
     {
-        traceEvent(TRACE_ERROR, "Failed to open communities file. %s", strerror(errno));
-        exit(-2);
+        if (errno != ENOENT)
+        {
+            traceEvent(TRACE_ERROR, "Failed to open communities file. %s", strerror(errno));
+            exit(-2);
+        }
     }
 
-    sss.sn_sock = open_socket(N2N_SN_COMM_PORT, 1 /* bind ANY */ );
+    sss.sn_sock = open_socket(sss.sn_port, 1 /* bind ANY */ );
     if ( -1 == sss.sn_sock )
     {
         traceEvent( TRACE_ERROR, "Failed to open supernodes communication socket. %s", strerror(errno) );
@@ -856,7 +918,7 @@ int main( int argc, char * const argv[] )
     }
     else
     {
-        traceEvent( TRACE_NORMAL, "supernode is listening on UDP %u (supernodes communication)", N2N_SN_MGMT_PORT );
+        traceEvent( TRACE_NORMAL, "supernode is listening on UDP %u (supernodes communication)", sss.sn_port );
     }
 #endif /* #ifdef N2N_MULTIPLE_SUPERNODES */
 
@@ -864,14 +926,13 @@ int main( int argc, char * const argv[] )
 
 #ifdef N2N_MULTIPLE_SUPERNODES
     int sn_num = sn_list_size(sss.supernodes.list_head);
-    if (sn_num == 1)
+    if(sn_num > 0)
     {
-        send_snm_req(sss.sn_sock, &sss.supernodes.list_head->sn);
-    }
-    else if (sn_num == 0)
-    {
-        traceEvent(TRACE_ERROR, "Don't have enough supernodes base. %s", strerror(errno));
-        exit(-2);
+        if (sn_num == 1)
+        {
+            /* currently requests only on 1st join */
+            send_snm_req(&sss, &sss.supernodes.list_head->sn);
+        }
     }
 #endif
 
