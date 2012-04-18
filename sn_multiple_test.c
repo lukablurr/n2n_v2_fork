@@ -62,7 +62,7 @@ static size_t generate_random_list(void          **list,
                                    add_func        add)
 {
     int i = 0, size = random() % 100;
-    traceEvent( TRACE_INFO, "Generating %d list items\n", size);
+    traceEvent( TRACE_NORMAL, "Generating %d list items\n", size);
 
     for (i = 0; i < size; i++)
     {
@@ -140,6 +140,36 @@ static int cmp_SNM_INFO( const void *a, const void *b )
     return 0;
 }
 
+static int cmp_SNM_ADV( const void *a, const void *b )
+{
+    const n2n_SNM_ADV_t *advA = (const n2n_SNM_ADV_t *) a;
+    const n2n_SNM_ADV_t *advB = (const n2n_SNM_ADV_t *) b;
+
+    int i, diff = memcmp(&advA->sn, &advB->sn, sizeof(n2n_sock_t));
+    if (diff)
+    {
+        return diff;
+    }
+    diff = advA->comm_num - advB->comm_num;
+    if (diff)
+    {
+        return diff;
+    }
+
+    for(i = 0; i < advA->comm_num; i++)
+    {
+        diff = memcmp(advA->comm_ptr[i].name,
+                      advB->comm_ptr[i].name,
+                      advA->comm_ptr[i].size);
+        if (diff)
+        {
+            return diff;
+        }
+    }
+
+    return 0;
+}
+
 /*
  * TESTING functions for MESSAGES
  */
@@ -196,6 +226,11 @@ static int test_SNM_MSG(size_t           struct_size,
         free_supernodes(&((n2n_SNM_INFO_t *) new_msg)->sn_ptr);
         free_communities(&((n2n_SNM_INFO_t *) new_msg)->comm_ptr);
     }
+    else if(hdr->type == SNM_TYPE_ADV_MSG)
+    {
+        log_SNM_ADV(new_msg);
+        free_communities(&((n2n_SNM_ADV_t *) new_msg)->comm_ptr);
+    }
 
     free(new_msg);
     return 0;
@@ -213,7 +248,7 @@ static void test_REQ_LIST()
     size_t         list_size = 0;
     struct comm_info *communities = NULL;
 
-    traceEvent( TRACE_INFO, "---- Testing SNM REQUEST message" );
+    traceEvent( TRACE_NORMAL, "---- Testing SNM REQUEST message" );
 
     SET_N(hdr.flags);
 
@@ -250,7 +285,7 @@ static void test_REQ_LIST()
     free_communities(&req.comm_ptr);
     clear_comm_list(&communities);
 
-    traceEvent( TRACE_INFO, "---- End testing SNM REQUEST message" );
+    traceEvent( TRACE_NORMAL, "---- End testing SNM REQUEST message" );
 }
 
 static void test_INFO()
@@ -260,7 +295,7 @@ static void test_INFO()
     n2n_SNM_INFO_t rsp;
     size_t         size = 0;
 
-    traceEvent( TRACE_INFO, "---- Testing SNM INFO message" );
+    traceEvent( TRACE_NORMAL, "---- Testing SNM INFO message" );
 
     SET_S(hdr.flags);
     SET_C(hdr.flags);
@@ -292,22 +327,38 @@ static void test_INFO()
 
     clear_snm_info(&rsp);
 
-    traceEvent( TRACE_INFO, "---- End testing SNM INFO message" );
+    traceEvent( TRACE_NORMAL, "---- End testing SNM INFO message" );
 }
-/*static void test_ADVERTISE_ME()
-{
-    snm_hdr_t          hdr;
-    n2n_SNM_ADV_ME_t   adv;
-    size_t             size = 0;
 
-    if (test_SNM_MSG(sizeof(n2n_SNM_ADV_ME_t),
+static void test_ADV()
+{
+    snm_hdr_t        hdr = {SNM_TYPE_ADV_MSG, 0, 5463};
+    n2n_SNM_ADV_t    adv;
+    size_t           size = 0;
+
+    traceEvent( TRACE_NORMAL, "---- Testing SNM ADV message" );
+
+    SET_N(hdr.flags);
+
+    comm_list_t communities = { NULL, 0 };
+    generate_random_list((void **) &communities.list_head, sizeof(struct comm_info),
+                         (rand_func) rand_comm, (add_func) comm_list_add);
+
+    int sock = open_socket(45555, 1);
+    build_snm_adv(sock, &communities, &adv);
+    closesocket(sock);
+
+    if (test_SNM_MSG(sizeof(n2n_SNM_ADV_t),
                      &hdr, &adv, size,
-                     (enc_func) encode_ADVERTISE_ME,
-                     (dec_func) decode_ADVERTISE_ME))
+                     (enc_func) encode_SNM_ADV,
+                     (dec_func) decode_SNM_ADV,
+                     cmp_SNM_ADV))
     {
-        traceEvent(TRACE_ERROR, "Error testing n2n_ADVERTISE_ME_t");
+        traceEvent(TRACE_ERROR, "Error testing n2n_SNM_ADV_t");
     }
-}*/
+
+    traceEvent( TRACE_NORMAL, "---- End testing SNM ADV message" );
+}
 
 /*
  * LISTS TESTS
@@ -408,7 +459,7 @@ static void test_list(size_t           item_size,
 
 static void test_sn()
 {
-    traceEvent(TRACE_DEBUG, "--- Testing supernodes lists IO");
+    traceEvent(TRACE_NORMAL, "--- Testing supernodes lists IO");
     test_list(sizeof(struct sn_info),
               (rand_func) rand_sn,
               (add_func) sn_list_add,
@@ -416,12 +467,12 @@ static void test_sn()
               (read_list_func) read_sn_list_from_file,
               (size_list_func) sn_list_size,
               (clear_list_func) clear_sn_list);
-    traceEvent(TRACE_DEBUG, "--- End testing supernodes lists IO");
+    traceEvent(TRACE_NORMAL, "--- End testing supernodes lists IO");
 }
 
 static void test_comm()
 {
-    traceEvent(TRACE_DEBUG, "--- Testing community lists IO");
+    traceEvent(TRACE_NORMAL, "--- Testing community lists IO");
     test_list(sizeof(struct comm_info),
               (rand_func) rand_comm,
               (add_func) comm_list_add,
@@ -429,7 +480,7 @@ static void test_comm()
               (read_list_func) read_comm_list_from_file,
               (size_list_func) comm_list_size,
               (clear_list_func) clear_comm_list);
-    traceEvent(TRACE_DEBUG, "--- End testing community lists IO");
+    traceEvent(TRACE_NORMAL, "--- End testing community lists IO");
 }
 
 int main()
@@ -437,7 +488,7 @@ int main()
     srandom(time(NULL));
     test_REQ_LIST();
     test_INFO();
-    /*test_ADVERTISE_ME();*/
+    test_ADV();
     test_sn();
     test_comm();
     return 0;

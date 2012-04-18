@@ -13,7 +13,7 @@
 
 #define SNM_TYPE_REQ_LIST_MSG    0x01
 #define SNM_TYPE_RSP_LIST_MSG    0x02
-#define SNM_TYPE_ADV_ME_MSG      0x03
+#define SNM_TYPE_ADV_MSG         0x03
 
 typedef struct snm_hdr
 {
@@ -24,7 +24,7 @@ typedef struct snm_hdr
 
 #define IS_REQ_LIST(pMsg)        ((pMsg)->hdr.type == SNM_TYPE_REQ_LIST_MSG)
 #define IS_RSP_LIST(pMsg)        ((pMsg)->hdr.type == SNM_TYPE_RSP_LIST_MSG)
-#define IS_ADV_ME(pMsg)          ((pMsg)->hdr.type == SNM_TYPE_ADV_ME_MSG)
+#define IS_ADV_ME(pMsg)          ((pMsg)->hdr.type == SNM_TYPE_ADV_MSG)
 
 /*
  * Flags (MSB order):
@@ -78,15 +78,14 @@ typedef struct n2n_SNM_INFO
     n2n_sock_t       *sn_ptr;
     snm_comm_name_t  *comm_ptr;
 } n2n_SNM_INFO_t;
-/*
 
 typedef struct n2n_ADVERTISE_ME
 {
     n2n_sock_t        sn;
     uint16_t          comm_num;
     snm_comm_name_t  *comm_ptr;
-} n2n_SNM_ADV_ME_t;
-*/
+} n2n_SNM_ADV_t;
+
 
 int alloc_communities( snm_comm_name_t **comm_ptr, unsigned int comm_num );
 void free_communities( snm_comm_name_t **comm_ptr );
@@ -131,23 +130,24 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
                      const uint8_t    *base,
                      size_t * rem,
                      size_t * idx );
-/*
 
-int encode_ADVERTISE_ME( uint8_t *base,
-                         size_t  *idx,
-                         const snm_hdr_t        *hdr,
-                         const n2n_SNM_ADV_ME_t *adv );
 
-int decode_ADVERTISE_ME( n2n_SNM_ADV_ME_t *pkt,
-                         const snm_hdr_t  *hdr,
-                         const uint8_t    *base,
-                         size_t *rem,
-                         size_t *idx );
-*/
+int encode_SNM_ADV( uint8_t *base,
+                    size_t  *idx,
+                    const snm_hdr_t       *hdr,
+                    const n2n_SNM_ADV_t   *adv );
+
+int decode_SNM_ADV( n2n_SNM_ADV_t    *pkt,
+                    const snm_hdr_t  *hdr,
+                    const uint8_t    *base,
+                    size_t *rem,
+                    size_t *idx );
+
 
 void log_SNM_hdr( const snm_hdr_t *hdr );
 void log_SNM_REQ( const n2n_SNM_REQ_t *req );
 void log_SNM_INFO( const n2n_SNM_INFO_t *info );
+void log_SNM_ADV( const n2n_SNM_ADV_t *adv );
 
 
 #endif /* SN_MULTIPLE_WIRE_H_ */
