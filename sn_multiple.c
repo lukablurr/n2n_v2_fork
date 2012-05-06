@@ -8,14 +8,14 @@
 #include "n2n.h"
 #include "sn_multiple.h"
 
-/*
- * Operations on sn_info lists.
- */
+/*******************************************************************
+ *                Operations on sn_info lists.                     *
+ *******************************************************************/
 
 int read_sn_list_from_file( const char *filename, struct sn_info **list )
 {
-    struct sn_info *sni = NULL;
-    n2n_sock_str_t sockbuf;
+    struct sn_info *sni = NULL, *tmp_list = NULL, *p = NULL;
+    n2n_sock_str_t sock_str;
 
     FILE *fd = fopen(filename, "r");
     if (!fd)
@@ -24,15 +24,7 @@ int read_sn_list_from_file( const char *filename, struct sn_info **list )
         return -1;
     }
 
-    unsigned int sn_num = 0;
-    if (fread(&sn_num, sizeof(unsigned int), 1, fd) != 1)
-    {
-        traceEvent(TRACE_ERROR, "couldn't read supernodes number from file");
-        goto out_err;
-    }
-
-    int i;
-    for (i = 0; i < sn_num; i++)
+    while (fscanf(fd, "%s\n", sock_str) > 0)
     {
         sni = calloc(1, sizeof(struct sn_info));
         if (!sni)
@@ -41,29 +33,43 @@ int read_sn_list_from_file( const char *filename, struct sn_info **list )
             goto out_err;
         }
 
-        if (fread(&sni->sn, sizeof(n2n_sock_t), 1, fd) != 1)
+        sock_from_cstr(&sni->sn, sock_str);
+
+        p = *list;
+        while (p)
         {
-            traceEvent(TRACE_ERROR, "couldn't read supernode entry from file");
-            goto out_err;
+            if (memcpy(&p->sn, &sni->sn, sizeof(n2n_sock_t)) == 0)
+            {
+                free(sni);
+                sni = NULL;
+                break;
+            }
+            p = p->next;
         }
 
-        sn_list_add(list, sni);
-
-        traceEvent(TRACE_DEBUG, "Added supernode %s", sock_to_cstr(sockbuf, &sni->sn));
+        if (sni)
+        {
+            sn_list_add(&tmp_list, sni);
+            traceEvent(TRACE_DEBUG, "Added supernode %s", sock_to_cstr(sock_str, &sni->sn));
+        }
     }
 
+    sn_list_add(list, tmp_list);
     sn_reverse_list(list);
 
     fclose(fd);
     return 0;
 
-    out_err: clear_sn_list(list);
+out_err:
+    clear_sn_list(list);
     fclose(fd);
     return -1;
 }
 
 int write_sn_list_to_file( const char *filename, struct sn_info *list )
 {
+    n2n_sock_str_t sock_str;
+
     FILE *fd = fopen(filename, "w");
     if (!fd)
     {
@@ -71,16 +77,9 @@ int write_sn_list_to_file( const char *filename, struct sn_info *list )
         return -1;
     }
 
-    unsigned int sn_num = sn_list_size(list);
-    if (fwrite(&sn_num, sizeof(unsigned int), 1, fd) != 1)
-    {
-        traceEvent(TRACE_ERROR, "couldn't write supernodes number to file");
-        goto out_err;
-    }
-
     while (list)
     {
-        if (fwrite(&list->sn, sizeof(n2n_sock_t), 1, fd) != 1)
+        if (fprintf(fd, "%s\n", sock_to_cstr(sock_str, &list->sn)) < 0)
         {
             traceEvent(TRACE_ERROR, "couldn't write supernode entry to file");
             goto out_err;
@@ -92,7 +91,8 @@ int write_sn_list_to_file( const char *filename, struct sn_info *list )
     fclose(fd);
     return 0;
 
-    out_err: fclose(fd);
+out_err:
+    fclose(fd);
     return -1;
 }
 
@@ -143,7 +143,7 @@ void sn_reverse_list( struct sn_info **list )
     }
 }
 
-struct sn_info *sn_find( struct sn_info *list, n2n_sock_t *sn )
+struct sn_info *sn_find( struct sn_info *list, const n2n_sock_t *sn )
 {
     while (list)
     {
@@ -156,11 +156,27 @@ struct sn_info *sn_find( struct sn_info *list, n2n_sock_t *sn )
     return NULL;
 }
 
-int update_sn_list( sn_list_t *list, n2n_sock_t *sn )
+struct sn_info *sn_list_add_create(struct sn_info **list, n2n_sock_t *sn)
 {
-    struct sn_info *item = sn_find(list->list_head, sn);
+    struct sn_info *new = calloc(1, sizeof(struct sn_info));
+    if (!new)
+    {
+        traceEvent(TRACE_ERROR, "not enough memory for new SN info");
+        return NULL;
+    }
+
+    memcpy(&new->sn, sn, sizeof(n2n_sock_t));
+    sn_list_add(list, new);
+
+    return new;
+}
+
+int update_supernodes(sn_list_t *supernodes, n2n_sock_t *sn)
+{
+    struct sn_info *item = sn_find(supernodes->list_head, sn);
     if (item)
     {
+        item->last_seen = time(NULL);
         return 0;
     }
 
@@ -187,16 +203,92 @@ int update_sn_list( sn_list_t *list, n2n_sock_t *sn )
         return -1;
     }
 
+    new->last_seen = time(NULL);
     memcpy(&new->sn, sn, sizeof(n2n_sock_t));
-    sn_list_add(&list->list_head, new);
-    list->bin_size += item_size;
+    sn_list_add(&supernodes->list_head, new);
+    supernodes->bin_size += item_size;
 
     return 1;
 }
 
-/*
- * Operations on comm_info lists.
- */
+struct sn_info *merge(struct sn_info *left, size_t left_size, struct sn_info *right, size_t right_size, sn_cmp_func func);
+
+struct sn_info *merge_sort(struct sn_info *list, size_t size, sn_cmp_func func)
+{
+    if (size == 1)
+    {
+        return list;
+    }
+
+    // else list size is > 1, so split the list into two sublists
+    struct sn_info *left = NULL, *right = NULL;
+    int i, middle = size / 2;
+
+    struct sn_info *x = list;
+    for(i = 0; i < middle; i++)
+    {
+        sn_list_add(&left, x);
+        x = x->next;
+    }
+    sn_reverse_list(&left);
+
+    for(; i < size; i++)
+    {
+        sn_list_add(&right, x);
+        x = x->next;
+    }
+    sn_reverse_list(&right);
+
+    left  = merge_sort(left,  middle, func);
+    right = merge_sort(right, size - middle, func);
+
+    return merge(left, middle, right, size - middle, func);
+}
+
+struct sn_info *merge(struct sn_info *left, size_t left_size, struct sn_info *right, size_t right_size, sn_cmp_func func)
+{
+    struct sn_info *result = NULL;
+
+#define first(sni)   sni
+
+    while( left_size > 0 || right_size > 0)
+    {
+        if (left_size > 0 && right_size > 0)
+        {
+            if (func(first(left), first(right)) <= 0)
+            {
+                sn_list_add(&result, first(left));
+                left = left->next;
+                left_size--;
+            }
+            else
+            {
+                sn_list_add(&result, first(right));
+                right = right->next;
+                right_size--;
+            }
+        }
+        else if (left_size > 0)
+        {
+            sn_list_add(&result, first(left));
+            left = left->next;
+            left_size--;
+        }
+        else if (right_size > 0)
+        {
+            sn_list_add(&result, first(right));
+            right = right->next;
+            right_size--;
+        }
+    }
+
+    sn_reverse_list(&result);
+    return result;
+}
+
+/*******************************************************************
+ *                 Operations on comm_info lists.                  *
+ *******************************************************************/
 int read_comm_list_from_file( const char *filename, struct comm_info **list )
 {
     struct comm_info *ci = NULL;
@@ -230,6 +322,13 @@ int read_comm_list_from_file( const char *filename, struct comm_info **list )
             traceEvent(TRACE_ERROR, "couldn't read SN number from file");
             goto out_err;
         }
+
+        if (fread(ci->sn_sock, sizeof(n2n_sock_t), N2N_MAX_SN_PER_COMM, fd) != N2N_MAX_SN_PER_COMM)
+        {
+            traceEvent(TRACE_ERROR, "couldn't read SN sockets from file");
+            goto out_err;
+        }
+
         if (fread(ci->community_name, sizeof(n2n_community_t), 1, fd) != 1)
         {
             traceEvent(TRACE_ERROR, "couldn't read community name from file");
@@ -270,6 +369,11 @@ int write_comm_list_to_file( const char *filename, struct comm_info *list )
         if (fwrite(&list->sn_num, sizeof(size_t), 1, fd) != 1)
         {
             traceEvent(TRACE_ERROR, "couldn't write SN number to file");
+            goto out_err;
+        }
+        if (fwrite(&list->sn_sock[0], sizeof(n2n_sock_t), N2N_MAX_SN_PER_COMM, fd) != N2N_MAX_SN_PER_COMM)
+        {
+            traceEvent(TRACE_ERROR, "couldn't write SN sockets to file");
             goto out_err;
         }
         if (fwrite(list->community_name, sizeof(n2n_community_t), 1, fd) != 1)
@@ -339,9 +443,9 @@ void comm_reverse_list( struct comm_info **list )
     }
 }
 
-static struct comm_info *find_comm( struct comm_info *list,
-                                    n2n_community_t *comm_name,
-                                    size_t comm_name_len )
+struct comm_info *find_comm( struct comm_info *list,
+                             n2n_community_t   comm_name,
+                             size_t            comm_name_len )
 {
     while (list)
     {
@@ -357,8 +461,7 @@ static struct comm_info *find_comm( struct comm_info *list,
 int update_comm_list( comm_list_t *comm_list, size_t sn_num,
                       snm_comm_name_t *community_name )
 {
-    struct comm_info *info = find_comm(comm_list->list_head,
-            &community_name->name, community_name->size);
+    struct comm_info *info = find_comm(comm_list->list_head, community_name->name, community_name->size);
     if (info)
     {
         info->sn_num += sn_num;
@@ -379,10 +482,9 @@ int update_comm_list( comm_list_t *comm_list, size_t sn_num,
     return 0;
 }
 
-int update_communities( comm_list_t *communities, n2n_community_t *comm_name )
+int update_communities( comm_list_t *communities, n2n_community_t comm_name )
 {
-    struct comm_info *info = find_comm(communities->list_head, comm_name,
-            strlen((char *) comm_name));
+    struct comm_info *info = find_comm(communities->list_head, comm_name, strlen((char *) comm_name));
     if (info)
     {
         return 0;
@@ -429,7 +531,7 @@ static int communities_to_array( uint16_t          *out_size,
  *                   SNM INFO related functions                    *
  *******************************************************************/
 
-static int snm_info_add_sn( n2n_SNM_INFO_t *info, struct sn_info *supernodes )
+int snm_info_add_sn( n2n_SNM_INFO_t *info, struct sn_info *supernodes )
 {
     info->sn_num = sn_list_size(supernodes);
     if (alloc_supernodes(&info->sn_ptr, info->sn_num))
@@ -501,7 +603,7 @@ void process_snm_rsp( sn_list_t *supernodes, comm_list_t *communities,
     /* Update list of supernodes */
     for (i = 0; i < snm_info->sn_num; i++)
     {
-        need_write = update_sn_list(supernodes, &snm_info->sn_ptr[i]);
+        need_write = update_supernodes(supernodes, &snm_info->sn_ptr[i]);
     }
 
     if (need_write)
@@ -553,12 +655,12 @@ void clear_snm_adv(n2n_SNM_ADV_t *adv)
     free_communities(&adv->comm_ptr);
 }
 
-void process_snm_adv(sn_list_t *supernodes, n2n_SNM_ADV_t *adv)
+void process_snm_adv(sn_list_t *supernodes, struct peer_info *edges, n2n_SNM_ADV_t *adv)
 {
     int i;
 
     /* Add senders address */
-    int need_write = update_sn_list(supernodes, &adv->sn);
+    int need_write = update_supernodes(supernodes, &adv->sn);
     if (need_write)
     {
         /* elements added */
