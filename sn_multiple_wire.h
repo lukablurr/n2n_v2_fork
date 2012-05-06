@@ -11,9 +11,11 @@
 #include <stdint.h>//TODO win
 #include "n2n_wire.h"
 
-#define SNM_TYPE_REQ_LIST_MSG    0x01
-#define SNM_TYPE_RSP_LIST_MSG    0x02
-#define SNM_TYPE_ADV_MSG         0x03
+#define SNM_TYPE_REQ_LIST_MSG             0x01
+#define SNM_TYPE_RSP_LIST_MSG             0x02
+#define SNM_TYPE_ADV_MSG                  0x03
+#define SNM_TYPE_REQ_SUPER_LIST_MSG       0x04
+#define SNM_TYPE_RSP_SUPER_LIST_MSG       0x04
 
 typedef struct snm_hdr
 {
