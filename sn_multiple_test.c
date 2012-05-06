@@ -34,22 +34,38 @@ typedef void (*rand_func) (void *item);
 /*
  * RANDOM functions
  */
+static void rand_n2n_sock(n2n_sock_t *sn)
+{
+    sn->family = AF_INET;
+    unsigned int ipv4 = random() % 0xFFFFFFFF;
+    memcpy(sn->addr.v4, &ipv4, IPV4_SIZE);
+    sn->port = random() % ((1 << 16) - 1);
+}
+
 static void rand_sn(struct sn_info *si)
 {
     si->next = NULL;
-    si->sn.family = AF_INET;
-    unsigned int ipv4 = random() % 0xFFFFFFFF;
-    memcpy(si->sn.addr.v4, &ipv4, IPV4_SIZE);
-    si->sn.port = random() % ((1 << 16) - 1);
+    rand_n2n_sock(&si->sn);
 }
 
 static void rand_comm(struct comm_info *ci)
 {
-    ci->next = NULL;
-    ci->sn_num = random() * 10;
+    int i;
 
-    int i = 0, name_size = random() % (N2N_COMMUNITY_SIZE - 1) + 1;
-    for (; i < name_size; i++)
+    ci->next = NULL;
+
+    ci->sn_num = random() % N2N_MAX_SN_PER_COMM;
+    for (i = 0; i < ci->sn_num; i++)
+    {
+        rand_n2n_sock(&ci->sn_sock[i]);
+    }
+    for (; i < N2N_MAX_SN_PER_COMM; i++)
+    {
+        memset(&ci->sn_sock[i], 0, sizeof(n2n_sock_t));
+    }
+
+    int name_size = random() % (N2N_COMMUNITY_SIZE - 1) + 1;
+    for (i = 0; i < name_size; i++)
     {
         ci->community_name[i] = random() % ('z' - 'a') + 'a';
     }
