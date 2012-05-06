@@ -447,11 +447,13 @@ extern n2n_sock_t * sock_from_cstr( n2n_sock_t *out,
         /* IPv4 */
         out->family = AF_INET;
         unsigned int ipv4[IPV4_SIZE];
-        sscanf(str, "%d.%d.%d.%d:%d", &ipv4[0], &ipv4[1], &ipv4[2], &ipv4[3], &out->port);
+        unsigned int port;
+        sscanf(str, "%d.%d.%d.%d:%d", &ipv4[0], &ipv4[1], &ipv4[2], &ipv4[3], &port);
         out->addr.v4[0] = ipv4[0];
         out->addr.v4[1] = ipv4[1];
         out->addr.v4[2] = ipv4[2];
         out->addr.v4[3] = ipv4[3];
+        out->port = port;
         return out;
     }
     else if (strchr(str, ':'))
