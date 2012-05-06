@@ -14,10 +14,16 @@
 #define N2N_SN_COMM_PORT                5646
 #define N2N_PERSIST_FILENAME_LEN        64
 
+#define N2N_MIN_SN_PER_COMM             3
+#define N2N_MAX_SN_PER_COMM             4
+#define N2N_MAX_COMM_PER_SN             3
+
 struct sn_info
 {
     struct sn_info     *next;
     n2n_sock_t          sn;
+    size_t              communities_num;
+    time_t              last_seen;
     //TODO set listening port also
 };
 
@@ -35,14 +41,19 @@ void sn_list_add( struct sn_info **list, struct sn_info *new );
 size_t clear_sn_list( struct sn_info **sn_list );
 size_t sn_list_size( const struct sn_info *list );
 void sn_reverse_list( struct sn_info **list );
-struct sn_info *sn_find( struct sn_info *list, n2n_sock_t *sn );
+struct sn_info *sn_find( struct sn_info *list, const n2n_sock_t *sn );
 
-int update_sn_list( sn_list_t *list, n2n_sock_t *sn );
+struct sn_info *sn_list_add_create(struct sn_info **list, n2n_sock_t *sn);
+int update_supernodes( sn_list_t *supernodes, n2n_sock_t *sn );
+
+typedef int (*sn_cmp_func)(struct sn_info *l, struct sn_info *r);
+struct sn_info *merge_sort(struct sn_info *list, size_t size, sn_cmp_func func);
 
 struct comm_info
 {
     struct comm_info   *next;
     size_t              sn_num;
+    n2n_sock_t          sn_sock[N2N_MAX_SN_PER_COMM];
     n2n_community_t     community_name;
    /*time_t              last_seen;*/
 };
@@ -61,15 +72,20 @@ void comm_list_add( struct comm_info **list, struct comm_info *new );
 size_t clear_comm_list( struct comm_info **comm_list );
 size_t comm_list_size( const struct comm_info *list );
 void comm_reverse_list( struct comm_info **list );
+struct comm_info *find_comm( struct comm_info *list,
+                             n2n_community_t   comm_name,
+                             size_t            comm_name_len );
 int update_comm_list( comm_list_t       *comm_list,
                       size_t             sn_num,
                       snm_comm_name_t   *community_name );
 
-int update_communities( comm_list_t *communities, n2n_community_t *comm_name );
+int update_communities( comm_list_t *communities, n2n_community_t comm_name );
 
 /*******************************************************************
  *                   SNM INFO related functions                    *
  *******************************************************************/
+int snm_info_add_sn( n2n_SNM_INFO_t *info, struct sn_info *supernodes );
+
 int build_snm_info(sn_list_t       *supernodes,
                    comm_list_t     *communities,
                    snm_hdr_t       *req_hdr,
@@ -86,7 +102,7 @@ void process_snm_rsp(sn_list_t        *supernodes,
  *******************************************************************/
 int build_snm_adv(int sock, comm_list_t *communities, n2n_SNM_ADV_t *adv);//TODO maybe add hdr also
 void clear_snm_adv(n2n_SNM_ADV_t *adv);
-void process_snm_adv(sn_list_t *supernodes, n2n_SNM_ADV_t *adv);
+void process_snm_adv(sn_list_t *supernodes, struct peer_info *edges, n2n_SNM_ADV_t *adv);
 
 /*void send_snm_req(int sock, n2n_sock_t *sn);*/
 
