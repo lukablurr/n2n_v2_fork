@@ -401,7 +401,7 @@ static int process_mgmt( n2n_sn_t * sss,
 
 #ifdef N2N_MULTIPLE_SUPERNODES
 
-static void send_snm_req(n2n_sn_t *sss, n2n_sock_t *sn)
+static void send_snm_req(n2n_sn_t *sss, n2n_sock_t *sn, int req_communities, snm_comm_name_t *communities, int communities_num)
 {
     uint8_t pktbuf[N2N_PKT_BUF_SIZE];
     size_t idx;
@@ -411,7 +411,17 @@ static void send_snm_req(n2n_sn_t *sss, n2n_sock_t *sn)
     n2n_SNM_REQ_t req = { 0, NULL };
 
     SET_S(hdr.flags);
-    SET_C(hdr.flags);
+
+    if (req_communities)
+    {
+        SET_C(hdr.flags);
+    }
+    else if (communities)
+    {
+        SET_N(hdr.flags);
+        req.comm_num = communities_num & 0xFFFF;
+        req.comm_ptr = communities;
+    }
 
     idx = 0;
     encode_SNM_REQ(pktbuf, &idx, &hdr, &req);
@@ -419,6 +429,18 @@ static void send_snm_req(n2n_sn_t *sss, n2n_sock_t *sn)
     traceEvent(TRACE_INFO, "send REQ to %s", sock_to_cstr(sockbuf, sn));
 
     sent = sendto_sock(sss->sn_sock, sn, pktbuf, idx);
+}
+
+static void send_req_to_all_supernodes(n2n_sn_t *sss, int request_communities, snm_comm_name_t *communities, int communities_num)
+{
+    struct sn_info *sni = sss->supernodes.list_head;
+
+    while (sni)
+    {
+        /* check what's new */
+        send_snm_req(sss, &sni->sn, request_communities, communities, communities_num);
+        sni = sni->next;
+    }
 }
 
 static void send_snm_rsp(n2n_sn_t *sss, const struct sockaddr_in *sender_sock, snm_hdr_t *hdr, n2n_SNM_REQ_t *req)
@@ -498,7 +520,7 @@ static int process_sn_msg( n2n_sn_t *sss,
         memcpy(&sn, sender_sock, sizeof(struct sockaddr_in));
         sn.port = htons(sn.port);
 
-        int need_write = update_sn_list(&sss->supernodes, &sn);
+        int need_write = update_supernodes(&sss->supernodes, &sn);
         if (need_write)
         {
             write_sn_list_to_file(sss->supernodes.filename,
@@ -507,7 +529,7 @@ static int process_sn_msg( n2n_sn_t *sss,
     }
     else if (msg_type == SNM_TYPE_RSP_LIST_MSG)
     {
-        if (hdr.seq_num != sss->seq_num && !GET_A(hdr.flags))
+        if (hdr.seq_num > sss->seq_num && !GET_A(hdr.flags))
         {
             traceEvent(TRACE_ERROR, "Unexpected sequence number %d", hdr.seq_num);
             return -1;
@@ -525,7 +547,7 @@ static int process_sn_msg( n2n_sn_t *sss,
         decode_SNM_ADV(&adv, &hdr, msg_buf, &rem, &idx);
         log_SNM_ADV(&adv);
 
-        process_snm_adv(&sss->supernodes, &adv);
+        process_snm_adv(&sss->supernodes, sss->edges, &adv);
 
         //TODO send advertise to edges
     }
@@ -748,7 +770,7 @@ static int process_udp( n2n_sn_t * sss,
         update_edge( sss, reg.edgeMac, cmn.community, &(ack.sock), now );
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-        update_communities( &sss->communities, &cmn.community );
+        update_communities(&sss->communities, cmn.community);
 #endif
 
         encode_REGISTER_SUPER_ACK( ackbuf, &encx, &cmn2, &ack );
@@ -922,18 +944,14 @@ int main( int argc, char * const argv[] )
     }
 #endif /* #ifdef N2N_MULTIPLE_SUPERNODES */
 
+
     traceEvent(TRACE_NORMAL, "supernode started");
 
+
 #ifdef N2N_MULTIPLE_SUPERNODES
-    int sn_num = sn_list_size(sss.supernodes.list_head);
-    if(sn_num > 0)
-    {
-        if (sn_num == 1)
-        {
-            /* currently requests only on 1st join */
-            send_snm_req(&sss, &sss.supernodes.list_head->sn);
-        }
-    }
+    int request_communities = (comm_list_size(sss.communities.list_head)) > 0 ? 0 : 1;
+
+    send_req_to_all_supernodes(&sss, request_communities, NULL, 0);
 #endif
 
     return run_loop(&sss);
