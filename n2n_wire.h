@@ -55,6 +55,8 @@ typedef enum n2n_pc n2n_pc_t;
 #define N2N_FLAGS_OPTIONS               0x0080
 #define N2N_FLAGS_SOCKET                0x0040
 #define N2N_FLAGS_FROM_SUPERNODE        0x0020
+//TODO
+#define N2N_FLAGS_SUPERNODE_ACC         0x0100
 
 /* The bits in flag that are the packet type */
 #define N2N_FLAGS_TYPE_MASK             0x001f  /* 0 - 31 */
