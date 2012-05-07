@@ -1625,34 +1625,31 @@ static void edge_send_snm_req(n2n_edge_t *eee, n2n_sock_t *sn)
     uint8_t pktbuf[N2N_PKT_BUF_SIZE];
     size_t idx;
     ssize_t sent;
+    n2n_common_t cmn;
+    n2n_SNM_REQ_t req = {0, NULL};
     n2n_sock_str_t sockbuf;
-    snm_hdr_t hdr = { SNM_TYPE_REQ_SUPER_LIST_MSG, 0, 0 };
-    snm_comm_name_t snm_comm_name;
-    n2n_SNM_REQ_t req;
 
-    snm_comm_name.size = strlen((char *)eee->community_name);
-    memcpy(snm_comm_name.name, eee->community_name, N2N_COMMUNITY_SIZE);
+    memset(&cmn, 0, sizeof(cmn));
+    memset(&req, 0, sizeof(req));
+    cmn.ttl=N2N_DEFAULT_TTL;
+    cmn.pc = MSG_TYPE_REQUEST_SUPER_LIST;/*n2n_register_super; TODO*/
+    cmn.flags = 0;
+    memcpy(cmn.community, eee->community_name, N2N_COMMUNITY_SIZE);
 
-    req.comm_num = 1;
-    req.comm_ptr = &snm_comm_name;
+    idx=0;
+    encode_SNM_EDGE_REQ( pktbuf, &idx, &cmn, &req );
 
-    SET_S(hdr.flags);
-    SET_N(hdr.flags);
-
-    idx = 0;
-    encode_SNM_REQ(pktbuf, &idx, &hdr, &req);
-
-    traceEvent(TRACE_INFO, "send REQ to %s", sock_to_cstr(sockbuf, sn));
+    traceEvent(TRACE_INFO, "send REQUEST_SUPER_LIST to %s", sock_to_cstr(sockbuf, sn));
 
     sent = sendto_sock(eee->udp_sock, pktbuf, idx, sn);
 }
-
+/*
 static int edge_process_sn_msg(n2n_edge_t *eee,
                                const n2n_sock_t *sender_sock,
                                const uint8_t *msg_buf,
                                size_t msg_size)
 {
-    snm_hdr_t           hdr; /* common fields in the packet header */
+    snm_hdr_t           hdr;
     size_t              rem;
     size_t              idx;
     size_t              msg_type;
@@ -1660,20 +1657,20 @@ static int edge_process_sn_msg(n2n_edge_t *eee,
 
     traceEvent( TRACE_DEBUG, "edge_process_sn_msg(%lu)", msg_size );
 
-    rem = msg_size; /* Counts down bytes of packet to protect against buffer overruns. */
-    idx = 0; /* marches through packet header as parts are decoded. */
+    rem = msg_size;
+    idx = 0;
     if (decode_SNM_hdr(&hdr, msg_buf, &rem, &idx) < 0)
     {
         traceEvent(TRACE_ERROR, "Failed to decode header");
-        return -1; /* failed to decode packet */
+        return -1;
     }
     log_SNM_hdr(&hdr);
 
-    msg_type = hdr.type; /* message type */
+    msg_type = hdr.type;
 
     int i;
 
-    if (msg_type == SNM_TYPE_RSP_SUPER_LIST_MSG)
+    if (msg_type == MSG_TYPE_REQUEST_SUPER_LIST_ACK)
     {
         n2n_SNM_INFO_t ack;
 
@@ -1720,6 +1717,7 @@ static int edge_process_sn_msg(n2n_edge_t *eee,
 
     return 0;
 }
+*/
 #endif
 
 /** Read a datagram from the main UDP socket to the internet. */
@@ -1772,11 +1770,11 @@ static void readFromIPSocket( n2n_edge_t * eee )
     /* hexdump( udp_buf, recvlen ); */
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-    if (!eee->registered)
+    /*if (!eee->registered)
     {
         edge_process_sn_msg(eee, orig_sender, udp_buf, recvlen);
         return;
-    }
+    }*/
 #endif
 
     rem = recvlen; /* Counts down bytes of packet to protect against buffer overruns. */
@@ -1902,6 +1900,50 @@ static void readFromIPSocket( n2n_edge_t * eee )
             else
             {
                 traceEvent( TRACE_WARNING, "Rx REGISTER_SUPER_ACK with no outstanding REGISTER_SUPER." );
+            }
+        }
+        else if (msg_type == MSG_TYPE_REQUEST_SUPER_LIST_ACK)
+        {
+            n2n_SNM_INFO_t ack;
+
+            uint8_t supernode_accepted = cmn.flags & N2N_FLAGS_SUPERNODE_ACC;
+
+            if (supernode_accepted)
+            {
+                n2n_sock_str_t sock_str;
+
+                int sn_num = MIN(ack.sn_num, N2N_EDGE_NUM_SUPERNODES);
+                clear_sn_list(&eee->supernodes.list_head);
+
+                for (i = 0; i < sn_num; i++)
+                {
+                    sock_to_cstr(sock_str, &ack.sn_ptr[i]);
+
+                    strncpy((eee->sn_ip_array[eee->sn_num]), sock_str, N2N_EDGE_SN_HOST_SIZE);
+                    traceEvent(TRACE_DEBUG, "Adding supernode[%u] = %s\n", (unsigned int) eee->sn_num, (eee->sn_ip_array[eee->sn_num]));
+                    ++eee->sn_num;
+
+                    update_supernodes(&eee->supernodes, &ack.sn_ptr[i]);
+                }
+
+                write_sn_list_to_file(eee->supernodes.filename, eee->supernodes.list_head);
+
+                eee->registered = 1;
+            }
+            else
+            {
+                struct sn_info *sni = sn_find(eee->supernodes.list_head, orig_sender);
+                sni->communities_num = ack.comm_num;
+                sni->last_seen = time(NULL);
+
+                for (i = 0; i < ack.sn_num; i++)
+                {
+                    if (!sn_find(eee->supernodes.list_head, &ack.sn_ptr[i]))
+                    {
+                        sn_list_add_create(&eee->supernodes.list_head, &ack.sn_ptr[i]);
+                        edge_send_snm_req(eee, &ack.sn_ptr[i]);
+                    }
+                }
             }
         }
         else
