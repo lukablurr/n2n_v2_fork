@@ -150,6 +150,47 @@ int decode_SNM_REQ( n2n_SNM_REQ_t    *pkt,
     return retval;
 }
 
+int encode_SNM_EDGE_REQ( uint8_t *base,
+                         size_t  *idx,
+                         const n2n_common_t  *cmn,
+                         const n2n_SNM_REQ_t *req )
+{
+    int retval = 0;
+    retval += encode_common(base, idx, cmn);
+    retval += encode_uint16(base, idx, req->comm_num);
+    //TODO maybe duplicate community????
+    int i;
+    for (i = 0; i < req->comm_num; i++)
+    {
+        retval += encode_SNM_comm(base, idx, &req->comm_ptr[i]);
+    }
+    return retval;
+}
+
+int decode_SNM_EDGE_REQ( n2n_SNM_REQ_t       *pkt,
+                         const n2n_common_t  *cmn,
+                         const uint8_t       *base,
+                         size_t *rem,
+                         size_t *idx )
+{
+    int retval = 0;
+
+    retval += decode_uint16(&pkt->comm_num, base, rem, idx);
+
+    if (alloc_communities(&pkt->comm_ptr, pkt->comm_num))
+    {
+        return -1;
+    }
+
+    int i;
+    for (i = 0; i < pkt->comm_num; i++)
+    {
+        retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
+    }
+
+    return retval;
+}
+
 int encode_SNM_INFO( uint8_t *base,
                      size_t  *idx,
                      const snm_hdr_t      *hdr,
@@ -201,6 +242,48 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
     for (i = 0; i < pkt->comm_num; i++)
     {
         retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
+    }
+
+    return retval;
+}
+
+int encode_SNM_EDGE_INFO( uint8_t *base,
+                          size_t  *idx,
+                          const n2n_common_t   *hdr,
+                          const n2n_SNM_INFO_t *info )
+{
+    int retval = 0;
+    retval += encode_common(base, idx, hdr);
+    retval += encode_uint16(base, idx, info->sn_num);
+    retval += encode_uint16(base, idx, info->comm_num);
+
+    int i;
+    for (i = 0; i < info->sn_num; i++)
+    {
+        retval += encode_sock(base, idx, &info->sn_ptr[i]);
+    }
+    return retval;
+}
+
+int decode_SNM_EDGE_INFO( n2n_SNM_INFO_t      *pkt,
+                          const n2n_common_t  *hdr,
+                          const uint8_t       *base,
+                          size_t * rem,
+                          size_t * idx )
+{
+    int retval = 0;
+    retval += decode_uint16(&pkt->sn_num, base, rem, idx);
+    retval += decode_uint16(&pkt->comm_num, base, rem, idx);
+
+    if (alloc_supernodes(&pkt->sn_ptr, pkt->sn_num))
+    {
+        return -1;
+    }
+
+    int i;
+    for (i = 0; i < pkt->sn_num; i++)
+    {
+        retval += decode_sock(&pkt->sn_ptr[i], base, rem, idx);
     }
 
     return retval;
