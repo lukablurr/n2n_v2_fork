@@ -304,6 +304,31 @@ static void test_REQ_LIST()
     traceEvent( TRACE_NORMAL, "---- End testing SNM REQUEST message" );
 }
 
+static int sn_cmp_timestamp_asc(struct sn_info *l, struct sn_info *r)
+{
+    return (l->last_seen - r->last_seen);
+}
+
+static void test_sn_sort(struct sn_info **list)
+{
+    *list = merge_sort(list, sn_list_size(list), sn_cmp_timestamp_asc);
+
+    int prev_last_seen = 0;
+
+    while (*list)
+    {
+        if ((*list)->last_seen < prev_last_seen)
+        {
+            traceEvent(TRACE_ERROR, "Sort testing failed");
+            return;
+        }
+
+        *list = (*list)->next;
+    }
+
+    traceEvent(TRACE_NORMAL, "--- Sort testing succeeded");
+}
+
 static void test_INFO()
 {
     snm_hdr_t      hdr = {SNM_TYPE_REQ_LIST_MSG, 0, 3134};
@@ -323,6 +348,8 @@ static void test_INFO()
     comm_list_t communities = { NULL, 0 };
     generate_random_list((void **) &communities.list_head, sizeof(struct comm_info),
                          (rand_func) rand_comm, (add_func) comm_list_add);
+
+    test_sn_sort(&supernodes.list_head);
 
     build_snm_info(&supernodes, &communities, &hdr, &req, &rsp);
     clear_sn_list(&supernodes.list_head);
