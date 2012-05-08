@@ -47,7 +47,7 @@ struct sn_info *sn_list_add_create(struct sn_info **list, n2n_sock_t *sn);
 int update_supernodes( sn_list_t *supernodes, n2n_sock_t *sn );
 
 typedef int (*sn_cmp_func)(struct sn_info *l, struct sn_info *r);
-struct sn_info *merge_sort(struct sn_info *list, size_t size, sn_cmp_func func);
+struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func);
 
 struct comm_info
 {

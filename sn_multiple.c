@@ -211,20 +211,20 @@ int update_supernodes(sn_list_t *supernodes, n2n_sock_t *sn)
     return 1;
 }
 
-struct sn_info *merge(struct sn_info *left, size_t left_size, struct sn_info *right, size_t right_size, sn_cmp_func func);
+struct sn_info *merge(struct sn_info **left, size_t left_size, struct sn_info **right, size_t right_size, sn_cmp_func func);
 
-struct sn_info *merge_sort(struct sn_info *list, size_t size, sn_cmp_func func)
+struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func)
 {
     if (size == 1)
     {
-        return list;
+        return *list;
     }
 
     // else list size is > 1, so split the list into two sublists
     struct sn_info *left = NULL, *right = NULL;
     int i, middle = size / 2;
 
-    struct sn_info *x = list;
+    struct sn_info *x = *list;
     for(i = 0; i < middle; i++)
     {
         sn_list_add(&left, x);
@@ -239,17 +239,17 @@ struct sn_info *merge_sort(struct sn_info *list, size_t size, sn_cmp_func func)
     }
     sn_reverse_list(&right);
 
-    left  = merge_sort(left,  middle, func);
-    right = merge_sort(right, size - middle, func);
+    left  = merge_sort(&left,  middle, func);
+    right = merge_sort(&right, size - middle, func);
 
-    return merge(left, middle, right, size - middle, func);
+    return merge(&left, middle, &right, size - middle, func);
 }
 
-struct sn_info *merge(struct sn_info *left, size_t left_size, struct sn_info *right, size_t right_size, sn_cmp_func func)
+struct sn_info *merge(struct sn_info **left, size_t left_size, struct sn_info **right, size_t right_size, sn_cmp_func func)
 {
     struct sn_info *result = NULL;
 
-#define first(sni)   sni
+#define first(sni)   *sni
 
     while( left_size > 0 || right_size > 0)
     {
@@ -258,26 +258,26 @@ struct sn_info *merge(struct sn_info *left, size_t left_size, struct sn_info *ri
             if (func(first(left), first(right)) <= 0)
             {
                 sn_list_add(&result, first(left));
-                left = left->next;
+                *left = (*left)->next;
                 left_size--;
             }
             else
             {
                 sn_list_add(&result, first(right));
-                right = right->next;
+                *right = (*right)->next;
                 right_size--;
             }
         }
         else if (left_size > 0)
         {
             sn_list_add(&result, first(left));
-            left = left->next;
+            *left = (*left)->next;
             left_size--;
         }
         else if (right_size > 0)
         {
             sn_list_add(&result, first(right));
-            right = right->next;
+            *right = (*right)->next;
             right_size--;
         }
     }
