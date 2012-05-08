@@ -311,19 +311,20 @@ static int sn_cmp_timestamp_asc(struct sn_info *l, struct sn_info *r)
 
 static void test_sn_sort(struct sn_info **list)
 {
-    *list = merge_sort(list, sn_list_size(list), sn_cmp_timestamp_asc);
+    *list = merge_sort(list, sn_list_size(*list), sn_cmp_timestamp_asc);
 
     int prev_last_seen = 0;
+    struct sn_info *sni = *list;
 
-    while (*list)
+    while (sni)
     {
-        if ((*list)->last_seen < prev_last_seen)
+        if (sni->last_seen < prev_last_seen)
         {
             traceEvent(TRACE_ERROR, "Sort testing failed");
             return;
         }
 
-        *list = (*list)->next;
+        sni = sni->next;
     }
 
     traceEvent(TRACE_NORMAL, "--- Sort testing succeeded");
