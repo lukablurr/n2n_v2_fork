@@ -224,18 +224,20 @@ struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func)
     struct sn_info *left = NULL, *right = NULL;
     int i, middle = size / 2;
 
-    struct sn_info *x = *list;
+    struct sn_info *x = *list, *next = NULL;
     for(i = 0; i < middle; i++)
     {
+        next = x->next;
         sn_list_add(&left, x);
-        x = x->next;
+        x = next;
     }
     sn_reverse_list(&left);
 
     for(; i < size; i++)
     {
+        next = x->next;
         sn_list_add(&right, x);
-        x = x->next;
+        x = next;
     }
     sn_reverse_list(&right);
 
@@ -247,7 +249,7 @@ struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func)
 
 struct sn_info *merge(struct sn_info **left, size_t left_size, struct sn_info **right, size_t right_size, sn_cmp_func func)
 {
-    struct sn_info *result = NULL;
+    struct sn_info *result = NULL, *next = NULL;
 
 #define first(sni)   *sni
 
@@ -257,27 +259,31 @@ struct sn_info *merge(struct sn_info **left, size_t left_size, struct sn_info **
         {
             if (func(first(left), first(right)) <= 0)
             {
+                next = (*left)->next;
                 sn_list_add(&result, first(left));
-                *left = (*left)->next;
+                *left = next;
                 left_size--;
             }
             else
             {
+                next = (*right)->next;
                 sn_list_add(&result, first(right));
-                *right = (*right)->next;
+                *right = next;
                 right_size--;
             }
         }
         else if (left_size > 0)
         {
+            next = (*left)->next;
             sn_list_add(&result, first(left));
-            *left = (*left)->next;
+            *left = next;
             left_size--;
         }
         else if (right_size > 0)
         {
+            next = (*right)->next;
             sn_list_add(&result, first(right));
-            *right = (*right)->next;
+            *right = next;
             right_size--;
         }
     }
