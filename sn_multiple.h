@@ -97,6 +97,9 @@ void process_snm_rsp(sn_list_t        *supernodes,
                      comm_list_t      *communities,
                      n2n_SNM_INFO_t   *snm_info);
 
+int build_snm_edge_info( sn_list_t *supernodes, comm_list_t *communities,
+                         n2n_common_t *req_hdr, n2n_SNM_INFO_t *info );
+
 /*******************************************************************
  *                    SNM ADV related functions                    *
  *******************************************************************/
