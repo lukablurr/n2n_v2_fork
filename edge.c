@@ -1033,18 +1033,19 @@ static int sn_cmp_timestamp_desc(struct sn_info *l, struct sn_info *r)
 
 static void resolve_supernodes(n2n_edge_t *eee, time_t nowTime)
 {
+    struct sn_info *p = NULL, *sorted_list = NULL;
+
     if (nowTime - eee->start_time < N2N_SUPER_DISCOVERY_INTERVAL)
     {
         return;
     }
 
-    struct sn_info *p = NULL;
-    struct sn_info *list = eee->supernodes.list_head;
+    size_t list_size = sn_list_size(eee->supernodes.list_head);
 
-    list = merge_sort(list, sn_list_size(list), sn_cmp_timestamp_desc);
+    sorted_list = merge_sort(&eee->supernodes.list_head, list_size, sn_cmp_timestamp_desc);
 
     int i;
-    for (i = 0, p = list; i < N2N_MIN_SN_PER_COMM && p != NULL; i++, p = p->next);
+    for (i = 0, p = sorted_list; i < N2N_MIN_SN_PER_COMM && p != NULL; i++, p = p->next);
     //TODO i < N2N_MIN_SN_PER_COMM
 
     clear_sn_list(&p);
@@ -1906,7 +1907,7 @@ static void readFromIPSocket( n2n_edge_t * eee )
         {
             n2n_SNM_INFO_t ack;
 
-            uint8_t supernode_accepted = cmn.flags & N2N_FLAGS_SUPERNODE_ACC;
+            uint16_t supernode_accepted = cmn.flags & N2N_FLAGS_SUPERNODE_ACC;
 
             if (supernode_accepted)
             {
@@ -2392,11 +2393,8 @@ int main(int argc, char* argv[])
     if (-1 == read_sn_list_from_file(eee.supernodes.filename,
                                      &eee.supernodes.list_head))
     {
-        if (errno != ENOENT)
-        {
-            traceEvent(TRACE_ERROR, "Failed to open supernodes file. %s", strerror(errno));
-            exit(-2);
-        }
+        traceEvent(TRACE_ERROR, "Failed to open supernodes file. %s", strerror(errno));
+        exit(-2);
     }
 
     if (sn_list_size(eee.supernodes.list_head) > 0)
@@ -2513,7 +2511,11 @@ int main(int argc, char* argv[])
 
     traceEvent(TRACE_NORMAL, "edge started");
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+    edge_send_snm_req(&eee, &eee.supernode);
+#else
     update_supernode_reg(&eee, time(NULL) );
+#endif
 
     return run_loop(&eee);
 }
