@@ -783,6 +783,30 @@ static int process_udp( n2n_sn_t * sss,
                     sock_to_cstr( sockbuf, &(ack.sock) ) );
 
     }
+#ifdef N2N_MULTIPLE_SUPERNODES
+    else if (msg_type == MSG_TYPE_REQUEST_SUPER_LIST)
+    {
+        uint8_t                   rspbuf[N2N_SN_PKTBUF_SIZE];
+        size_t                    encx = 0;
+        n2n_SNM_INFO_t            info;
+
+        build_snm_edge_info(&sss->supernodes, &sss->communities, &cmn, &info);
+
+        cmn.ttl = N2N_DEFAULT_TTL;
+        cmn.pc  = MSG_TYPE_REQUEST_SUPER_LIST_ACK;
+
+        encode_SNM_EDGE_INFO(rspbuf, &encx, &cmn, &info);
+        clear_snm_info(&info);
+
+        sendto( sss->sock, rspbuf, encx, 0,
+                (struct sockaddr *)sender_sock, sizeof(struct sockaddr_in) );
+
+        inet_ntop(AF_INET, sender_sock, sockbuf, INET_ADDRSTRLEN);
+
+        traceEvent( TRACE_DEBUG, "Tx REQUEST_SUPER_LIST_ACK for %s [%s]",
+                    cmn.community, sockbuf );
+    }
+#endif
 
 
     return 0;
