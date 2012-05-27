@@ -41,6 +41,7 @@ typedef struct snm_hdr
 #define C_FLAG_POS       6
 #define N_FLAG_POS       5
 #define A_FLAG_POS       4
+#define E_FLAG_POS       3
 
 #define __FLAG_MASK(pos)           (1 << (pos))
 #define __BIT_FLAG(flags, pos)     (((flags) >> (pos)) & 1)
@@ -49,16 +50,19 @@ typedef struct snm_hdr
 #define SET_C(flags)      (flags) |= __FLAG_MASK(C_FLAG_POS)
 #define SET_N(flags)      (flags) |= __FLAG_MASK(N_FLAG_POS)
 #define SET_A(flags)      (flags) |= __FLAG_MASK(A_FLAG_POS)
+#define SET_E(flags)      (flags) |= __FLAG_MASK(E_FLAG_POS)
 
 #define GET_S(flags)      __BIT_FLAG(flags, S_FLAG_POS)
 #define GET_C(flags)      __BIT_FLAG(flags, C_FLAG_POS)
 #define GET_N(flags)      __BIT_FLAG(flags, N_FLAG_POS)
 #define GET_A(flags)      __BIT_FLAG(flags, A_FLAG_POS)
+#define GET_E(flags)      __BIT_FLAG(flags, E_FLAG_POS)
 
 #define CLR_S(flags)      (flags) &= ~__FLAG_MASK(S_FLAG_POS)
 #define CLR_C(flags)      (flags) &= ~__FLAG_MASK(C_FLAG_POS)
 #define CLR_N(flags)      (flags) &= ~__FLAG_MASK(N_FLAG_POS)
 #define CLR_A(flags)      (flags) &= ~__FLAG_MASK(A_FLAG_POS)
+#define CLR_E(flags)      (flags) &= ~__FLAG_MASK(E_FLAG_POS)
 
 typedef struct snm_comm_name
 {
