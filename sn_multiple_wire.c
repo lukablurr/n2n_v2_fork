@@ -196,20 +196,25 @@ int encode_SNM_INFO( uint8_t *base,
                      const snm_hdr_t      *hdr,
                      const n2n_SNM_INFO_t *info )
 {
+    int i;
     int retval = 0;
     retval += encode_SNM_hdr(base, idx, hdr);
     retval += encode_uint16(base, idx, info->sn_num);
     retval += encode_uint16(base, idx, info->comm_num);
 
-    int i;
-    for (i = 0; i < info->sn_num; i++)
+    if (GET_S(hdr->flags))
     {
-        retval += encode_sock(base, idx, &info->sn_ptr[i]);
+        for (i = 0; i < info->sn_num; i++)
+        {
+            retval += encode_sock(base, idx, &info->sn_ptr[i]);
+        }
     }
-
-    for(i = 0; i < info->comm_num; i++)
+    if (GET_C(hdr->flags))
     {
-        retval += encode_SNM_comm(base, idx, &info->comm_ptr[i]);
+        for (i = 0; i < info->comm_num; i++)
+        {
+            retval += encode_SNM_comm(base, idx, &info->comm_ptr[i]);
+        }
     }
     return retval;
 }
@@ -220,28 +225,34 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
                      size_t * rem,
                      size_t * idx )
 {
+    int i;
     int retval = 0;
     retval += decode_uint16(&pkt->sn_num, base, rem, idx);
     retval += decode_uint16(&pkt->comm_num, base, rem, idx);
 
-    if (alloc_supernodes(&pkt->sn_ptr, pkt->sn_num))
+    if (GET_S(hdr->flags))
     {
-        return -1;
+        if (alloc_supernodes(&pkt->sn_ptr, pkt->sn_num))
+        {
+            return -1;
+        }
+        for (i = 0; i < pkt->sn_num; i++)
+        {
+            retval += decode_sock(&pkt->sn_ptr[i], base, rem, idx);
+        }
     }
-    if (alloc_communities(&pkt->comm_ptr, pkt->comm_num))
+    if (GET_C(hdr->flags))
     {
-        free_supernodes(&pkt->sn_ptr);
-        return -1;
-    }
+        if (alloc_communities(&pkt->comm_ptr, pkt->comm_num))
+        {
+            free_supernodes(&pkt->sn_ptr);
+            return -1;
+        }
 
-    int i;
-    for (i = 0; i < pkt->sn_num; i++)
-    {
-        retval += decode_sock(&pkt->sn_ptr[i], base, rem, idx);
-    }
-    for (i = 0; i < pkt->comm_num; i++)
-    {
-        retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
+        for (i = 0; i < pkt->comm_num; i++)
+        {
+            retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
+        }
     }
 
     return retval;
@@ -340,18 +351,21 @@ int decode_SNM_ADV( n2n_SNM_ADV_t     *pkt,
 
 void log_SNM_hdr( const snm_hdr_t *hdr )
 {
-    traceEvent( TRACE_DEBUG, "HEADER type=%d S=%d C=%d N=%d A=%d Seq=%d", hdr->type,
-                GET_S(hdr->flags), GET_C(hdr->flags), GET_N(hdr->flags), GET_A(hdr->flags),
+    traceEvent( TRACE_DEBUG, "HEADER type=%d S=%d C=%d N=%d A=%d E=%d Seq=%d", hdr->type,
+                GET_S(hdr->flags), GET_C(hdr->flags), GET_N(hdr->flags), GET_A(hdr->flags), GET_E(hdr->flags),
                 hdr->seq_num );
 }
 void log_SNM_REQ( const n2n_SNM_REQ_t *req )
 {
     int i;
     traceEvent( TRACE_DEBUG, "REQ Communities=%d", req->comm_num );
-    for(i = 0; i < req->comm_num; i++)
+    if (req->comm_ptr)
     {
-        traceEvent( TRACE_DEBUG, "\t[%d] len=%d name=%s", i,
-                    req->comm_ptr[i].size, req->comm_ptr[i].name );
+        for(i = 0; i < req->comm_num; i++)
+        {
+            traceEvent( TRACE_DEBUG, "\t[%d] len=%d name=%s", i,
+                        req->comm_ptr[i].size, req->comm_ptr[i].name );
+        }
     }
 }
 void log_SNM_INFO( const n2n_SNM_INFO_t *info )
@@ -362,14 +376,21 @@ void log_SNM_INFO( const n2n_SNM_INFO_t *info )
     traceEvent( TRACE_DEBUG, "INFO Supernodes=%d Communities=%d",
                 info->sn_num, info->comm_num );
 
-    for(i = 0; i < info->sn_num; i++)
+    if (info->sn_ptr)
     {
-        traceEvent( TRACE_DEBUG, "\t[S%d] %s", i, sock_to_cstr(sockbuf, &info->sn_ptr[i]) );
+        for(i = 0; i < info->sn_num; i++)
+        {
+            traceEvent( TRACE_DEBUG, "\t[S%d] %s", i, sock_to_cstr(sockbuf, &info->sn_ptr[i]) );
+        }
     }
-    for(i = 0; i < info->comm_num; i++)
+
+    if (info->comm_ptr)
     {
-        traceEvent( TRACE_DEBUG, "\t[C%d] len=%d name=%s", i, info->comm_ptr[i].size,
-                    (info->comm_ptr[i].size > 0) ? (const char *) info->comm_ptr[i].name : "" );
+        for(i = 0; i < info->comm_num; i++)
+        {
+            traceEvent( TRACE_DEBUG, "\t[C%d] len=%d name=%s", i, info->comm_ptr[i].size,
+                        (info->comm_ptr[i].size > 0) ? (const char *) info->comm_ptr[i].name : "" );
+        }
     }
 }
 void log_SNM_ADV( const n2n_SNM_ADV_t *adv )
@@ -380,9 +401,12 @@ void log_SNM_ADV( const n2n_SNM_ADV_t *adv )
     traceEvent( TRACE_DEBUG, "ADV Supernode=%s Communities=%d",
                 sock_to_cstr(sockbuf, &adv->sn), adv->comm_num );
 
-    for(i = 0; i < adv->comm_num; i++)
+    if (adv->comm_ptr)
     {
-        traceEvent( TRACE_DEBUG, "\t[C%d] len=%d name=%s", i, adv->comm_ptr[i].size,
-                    (adv->comm_ptr[i].size > 0) ? (const char *) adv->comm_ptr[i].name : "" );
+        for(i = 0; i < adv->comm_num; i++)
+        {
+            traceEvent( TRACE_DEBUG, "\t[C%d] len=%d name=%s", i, adv->comm_ptr[i].size,
+                        (adv->comm_ptr[i].size > 0) ? (const char *) adv->comm_ptr[i].name : "" );
+        }
     }
 }
