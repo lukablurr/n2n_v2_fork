@@ -18,6 +18,11 @@
 #define N2N_MAX_SN_PER_COMM             4
 #define N2N_MAX_COMM_PER_SN             3
 
+#define N2N_SNM_EDGE_STATE_DISCOVERY    0
+#define N2N_SNM_EDGE_STATE_REQ_ADV      1
+#define N2N_SNM_EDGE_STATE_READY        2
+
+
 struct sn_info
 {
     struct sn_info     *next;
@@ -35,6 +40,8 @@ typedef struct sn_list
 } sn_list_t;
 
 /* Operations on sn_info lists. */
+void sn_cpy(n2n_sock_t *dst, const n2n_sock_t *src);
+
 int read_sn_list_from_file( const char *filename, struct sn_info **list );
 int write_sn_list_to_file( const char *filename, struct sn_info *list );
 void sn_list_add( struct sn_info **list, struct sn_info *new );
@@ -48,6 +55,7 @@ int update_supernodes( sn_list_t *supernodes, n2n_sock_t *sn );
 
 typedef int (*sn_cmp_func)(struct sn_info *l, struct sn_info *r);
 struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func);
+void sn_list_sort(struct sn_info **list, sn_cmp_func cmp_func);
 
 struct comm_info
 {
@@ -90,6 +98,7 @@ int build_snm_info(sn_list_t       *supernodes,
                    comm_list_t     *communities,
                    snm_hdr_t       *req_hdr,
                    n2n_SNM_REQ_t   *req,
+                   snm_hdr_t       *info_hdr,
                    n2n_SNM_INFO_t  *info);
 void clear_snm_info(n2n_SNM_INFO_t *info);
 
