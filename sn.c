@@ -426,7 +426,7 @@ static void send_snm_req(n2n_sn_t *sss, n2n_sock_t *sn, int req_communities, snm
     idx = 0;
     encode_SNM_REQ(pktbuf, &idx, &hdr, &req);
 
-    traceEvent(TRACE_INFO, "send REQ to %s", sock_to_cstr(sockbuf, sn));
+    traceEvent(TRACE_INFO, "send SNM_REQ to %s", sock_to_cstr(sockbuf, sn));
 
     sent = sendto_sock(sss->sn_sock, sn, pktbuf, idx);
 }
@@ -443,44 +443,44 @@ static void send_req_to_all_supernodes(n2n_sn_t *sss, int request_communities, s
     }
 }
 
-static void send_snm_rsp(n2n_sn_t *sss, const struct sockaddr_in *sender_sock, snm_hdr_t *hdr, n2n_SNM_REQ_t *req)
+static void send_snm_rsp(n2n_sn_t *sss, const n2n_sock_t *sock, snm_hdr_t *hdr, n2n_SNM_REQ_t *req)
 {
+    n2n_sock_str_t sock_buf;
     uint8_t pktbuf[N2N_PKT_BUF_SIZE];
     size_t  idx;
-    snm_hdr_t rsp_hdr = {SNM_TYPE_RSP_LIST_MSG, hdr->flags, hdr->seq_num};
+    snm_hdr_t rsp_hdr;
     n2n_SNM_INFO_t rsp;
 
-    build_snm_info(&sss->supernodes, &sss->communities, hdr, req, &rsp);
+    build_snm_info(&sss->supernodes, &sss->communities, hdr, req, &rsp_hdr, &rsp);
 
     idx = 0;
     encode_SNM_INFO(pktbuf, &idx, &rsp_hdr, &rsp);
+
+    traceEvent(TRACE_INFO, "send SNM_RSP to %s", sock_to_cstr(sock_buf, sock));
+    log_SNM_INFO(&rsp);
+
     clear_snm_info(&rsp);
 
-    int r = sendto(sss->sn_sock, pktbuf, idx, 0/*flags*/,
-                   (struct sockaddr *) sender_sock, sizeof(struct sockaddr_in));
-    if (r <= 0)
-    {
-        traceEvent(TRACE_ERROR, "process_sn_msg : sendto failed. %s", strerror(errno));
-    }
+    sendto_sock(sss->sn_sock, sock, pktbuf, idx);
 }
 
-static void send_snm_adv(n2n_sn_t *sss, n2n_sock_t *sn)
+static void send_snm_adv(n2n_sn_t *sss, n2n_sock_t *sn, comm_list_t *communities)
 {
     uint8_t pktbuf[N2N_PKT_BUF_SIZE];
     size_t idx;
-    ssize_t sent;
     n2n_sock_str_t sockbuf;
-    snm_hdr_t hdr = { SNM_TYPE_ADV_MSG, 0, ++sss->seq_num };
+    snm_hdr_t hdr = { SNM_TYPE_ADV_MSG, 0, 0 };
     n2n_SNM_ADV_t adv;
 
-    build_snm_adv(sss->sn_sock, &sss->communities, &adv);
+    build_snm_adv(sss->sock, communities, &adv);
 
     idx = 0;
     encode_SNM_ADV(pktbuf, &idx, &hdr, &adv);
 
     traceEvent(TRACE_INFO, "send ADV to %s", sock_to_cstr(sockbuf, sn));
+    log_SNM_ADV(&adv);
 
-    sent = sendto_sock(sss->sn_sock, sn, pktbuf, idx);
+    sendto_sock(sss->sn_sock, sn, pktbuf, idx);
 }
 
 static int process_sn_msg( n2n_sn_t *sss,
@@ -514,17 +514,29 @@ static int process_sn_msg( n2n_sn_t *sss,
         decode_SNM_REQ(&req, &hdr, msg_buf, &rem, &idx);
         log_SNM_REQ(&req);
 
-        send_snm_rsp(sss, sender_sock, &hdr, &req);
-
         n2n_sock_t sn;
-        memcpy(&sn, sender_sock, sizeof(struct sockaddr_in));
+        sn_cpy(&sn, (const n2n_sock_t *) sender_sock);
         sn.port = htons(sn.port);
 
-        int need_write = update_supernodes(&sss->supernodes, &sn);
-        if (need_write)
+        if (GET_A(hdr.flags))
         {
-            write_sn_list_to_file(sss->supernodes.filename,
-                                  sss->supernodes.list_head);
+            /* request for ADV */
+            send_snm_adv(sss, &sn, NULL);
+        }
+        else
+        {
+            /* request for INFO */
+            send_snm_rsp(sss, &sn, &hdr, &req);
+        }
+
+        if (!GET_E(hdr.flags))
+        {
+            int need_write = update_supernodes(&sss->supernodes, &sn);
+            if (need_write)
+            {
+                write_sn_list_to_file(sss->supernodes.filename,
+                                      sss->supernodes.list_head);
+            }
         }
     }
     else if (msg_type == SNM_TYPE_RSP_LIST_MSG)
@@ -552,6 +564,32 @@ static int process_sn_msg( n2n_sn_t *sss,
         //TODO send advertise to edges
     }
 
+/*
+#ifdef N2N_MULTIPLE_SUPERNODES
+    else if (msg_type == SNM_TYPE_REQ_LIST_MSG)
+    {
+        uint8_t                   rspbuf[N2N_SN_PKTBUF_SIZE];
+        size_t                    encx = 0;
+        n2n_SNM_INFO_t            info;
+
+        build_snm_edge_info(&sss->supernodes, &sss->communities, &cmn, &info);
+
+        cmn.ttl = N2N_DEFAULT_TTL;
+        cmn.pc  = MSG_TYPE_REQUEST_SUPER_LIST_ACK;
+
+        encode_SNM_EDGE_INFO(rspbuf, &encx, &cmn, &info);
+        clear_snm_info(&info);
+
+        sendto( sss->sock, rspbuf, encx, 0,
+                (struct sockaddr *)sender_sock, sizeof(struct sockaddr_in) );
+
+        inet_ntop(AF_INET, sender_sock, sockbuf, INET_ADDRSTRLEN);
+
+        traceEvent( TRACE_DEBUG, "Tx REQUEST_SUPER_LIST_ACK for %s [%s]",
+                    cmn.community, sockbuf );
+    }
+#endif
+*/
     return 0;
 }
 #endif
@@ -783,30 +821,6 @@ static int process_udp( n2n_sn_t * sss,
                     sock_to_cstr( sockbuf, &(ack.sock) ) );
 
     }
-#ifdef N2N_MULTIPLE_SUPERNODES
-    else if (msg_type == MSG_TYPE_REQUEST_SUPER_LIST)
-    {
-        uint8_t                   rspbuf[N2N_SN_PKTBUF_SIZE];
-        size_t                    encx = 0;
-        n2n_SNM_INFO_t            info;
-
-        build_snm_edge_info(&sss->supernodes, &sss->communities, &cmn, &info);
-
-        cmn.ttl = N2N_DEFAULT_TTL;
-        cmn.pc  = MSG_TYPE_REQUEST_SUPER_LIST_ACK;
-
-        encode_SNM_EDGE_INFO(rspbuf, &encx, &cmn, &info);
-        clear_snm_info(&info);
-
-        sendto( sss->sock, rspbuf, encx, 0,
-                (struct sockaddr *)sender_sock, sizeof(struct sockaddr_in) );
-
-        inet_ntop(AF_INET, sender_sock, sockbuf, INET_ADDRSTRLEN);
-
-        traceEvent( TRACE_DEBUG, "Tx REQUEST_SUPER_LIST_ACK for %s [%s]",
-                    cmn.community, sockbuf );
-    }
-#endif
 
 
     return 0;
@@ -882,13 +896,9 @@ int main( int argc, char * const argv[] )
                 break;
             case 'i':
             {
-                n2n_sock_str_t sn_str;
-                strcpy(sn_str, optarg);
-
-                struct sn_info *si = calloc(1, sizeof(struct sn_info));
-                sock_from_cstr(&si->sn, sn_str);
-                sn_list_add(&sss.supernodes.list_head, si);
-
+                n2n_sock_t sn;
+                sock_from_cstr(&sn, optarg);
+                update_supernodes(&sss.supernodes, &sn);
                 break;
             }
 #endif
