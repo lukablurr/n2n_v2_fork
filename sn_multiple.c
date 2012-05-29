@@ -12,28 +12,6 @@
  *                Operations on sn_info lists.                     *
  *******************************************************************/
 
-static int sn_cmp(const n2n_sock_t *left, const n2n_sock_t *right)
-{
-    if (left->family != right->family)
-        return (left->family - right->family);
-    else if (left->port != right->port)
-            return (left->port - right->port);
-    else if (left->family == AF_INET)
-        return memcmp(left->addr.v4, right->addr.v4, IPV4_SIZE);
-
-    return memcmp(left->addr.v6, right->addr.v6, IPV6_SIZE);
-}
-
-void sn_cpy(n2n_sock_t *dst, const n2n_sock_t *src)
-{
-    dst->family = src->family;
-    dst->port   = src->port;
-    if (src->family == AF_INET)
-        memcpy(dst->addr.v4, src->addr.v4, IPV4_SIZE);
-    else
-        memcpy(dst->addr.v6, src->addr.v6, IPV6_SIZE);
-}
-
 static FILE *open_list_file_for_read( const char *filename )
 {
     int fd = open(filename, O_CREAT | O_RDONLY, 0666);
@@ -483,49 +461,49 @@ struct comm_info *find_comm( struct comm_info *list,
     return NULL;
 }
 
-int update_comm_list( comm_list_t *comm_list, size_t sn_num,
-                      snm_comm_name_t *community_name )
+int add_new_community(comm_list_t        *communities,
+                      n2n_community_t     comm_name,
+                      struct comm_info  **comm)
 {
-    struct comm_info *info = find_comm(comm_list->list_head, community_name->name, community_name->size);
-    if (info)
+    int retval = 0;
+
+    struct comm_info *ci = find_comm(communities->list_head,
+                                     comm_name,
+                                     strlen((const char *) comm_name));
+    if (!ci)
     {
-        info->sn_num += sn_num;
-        return 0;
+        ci = calloc(1, sizeof(struct comm_info));
+        if (!ci)
+        {
+            traceEvent(TRACE_ERROR, "not enough memory for new community info");
+            return -1;
+        }
+
+        memcpy(&ci->community_name, comm_name, sizeof(n2n_community_t));
+        comm_list_add(&communities->list_head, ci);
+
+        retval = 1;
     }
 
-    struct comm_info *new = calloc(1, sizeof(struct comm_info));
-    if (new)
-    {
-        traceEvent(TRACE_ERROR, "not enough memory for new community info");
-        return -1;
-    }
+    *comm = ci;
 
-    memcpy(&new->community_name, community_name->name, community_name->size);
-    new->sn_num = sn_num;
-
-    comm_list_add(&comm_list->list_head, new);
-    return 0;
+    return retval;
 }
 
-int update_communities( comm_list_t *communities, n2n_community_t comm_name )
+int update_communities( comm_list_t       *communities,
+                        snm_comm_name_t   *community_name,
+                        n2n_sock_t        *supernode )
 {
-    struct comm_info *info = find_comm(communities->list_head, comm_name, strlen((char *) comm_name));
-    if (info)
-    {
-        return 0;
-    }
+    struct comm_info *ci = NULL;
 
-    struct comm_info *new = calloc(1, sizeof(struct comm_info));
-    if (!new)
+    add_new_community(communities, community_name->name, &ci);
+    if (!ci)
     {
-        traceEvent(TRACE_ERROR, "not enough memory for new community info");
         return -1;
     }
 
-    memcpy(&new->community_name, comm_name, sizeof(n2n_community_t));
-    new->sn_num = 1;
+    sn_cpy(&ci->sn_sock[ci->sn_num++], supernode);
 
-    comm_list_add(&communities->list_head, new);
     return 0;
 }
 
@@ -624,6 +602,8 @@ int build_snm_info( sn_list_t       *supernodes,
 
         if (GET_C(req_hdr->flags))
         {
+            SET_C(info_hdr->flags);
+
             /* Set communities list */
             retval += snm_info_add_comm(info, communities->list_head);
         }
@@ -655,73 +635,39 @@ void clear_snm_info( n2n_SNM_INFO_t *info )
 /*
  * Process response
  */
-void process_snm_rsp( sn_list_t *supernodes, comm_list_t *communities,
-                      n2n_SNM_INFO_t *snm_info )
+void process_snm_rsp( sn_list_t       *supernodes,
+                      comm_list_t     *communities,
+                      n2n_sock_t      *sender,
+                      snm_hdr_t       *hdr,
+                      n2n_SNM_INFO_t  *rsp )
 {
     int i;
 
     int need_write = 0;
 
     /* Update list of supernodes */
-    for (i = 0; i < snm_info->sn_num; i++)
+    if (GET_S(hdr->flags))
     {
-        need_write = update_supernodes(supernodes, &snm_info->sn_ptr[i]);
-    }
-
-    if (need_write)
-    {
-        /* elements added */
-        write_sn_list_to_file(supernodes->filename, supernodes->list_head);
-    }
-
-    /* Update list of communities from recvd from a supernode */
-    for (i = 0; i < snm_info->comm_num; i++)
-    {
-        update_comm_list(communities, 1, &snm_info->comm_ptr[i]);
-    }
-}
-
-int snm_edge_info_add_sn( n2n_SNM_INFO_t *info, n2n_sock_t *supernodes, int supernodes_num )
-{
-    info->sn_num = supernodes_num;
-    if (alloc_supernodes(&info->sn_ptr, info->sn_num))
-    {
-        traceEvent(TRACE_ERROR, "could not allocate supernodes array");
-        return -1;
-    }
-
-    memcpy(info->sn_ptr, supernodes, supernodes_num * sizeof(n2n_sock_t));
-
-    return 0;
-}
-
-int build_snm_edge_info( sn_list_t *supernodes, comm_list_t *communities,
-                         n2n_common_t *req_hdr, n2n_SNM_INFO_t *info )
-{
-    int retval = 0;
-
-    memset(info, 0, sizeof(n2n_SNM_INFO_t));
-
-    struct comm_info *ci = communities->list_head;
-    while (ci)
-    {
-        if (!memcmp(req_hdr->community, ci->community_name, sizeof(n2n_community_t)))
+        for (i = 0; i < rsp->sn_num; i++)
         {
-            info->comm_num = 0;
-            info->comm_ptr = NULL;
+            need_write = update_supernodes(supernodes, &rsp->sn_ptr[i]);
+        }
 
-            retval = snm_edge_info_add_sn(info, ci->sn_sock, ci->sn_num);
-
-            return retval;
+        if (need_write)
+        {
+            /* elements added */
+            write_sn_list_to_file(supernodes->filename, supernodes->list_head);
         }
     }
 
-    info->comm_num = comm_list_size(communities->list_head);
-    /*info.comm_ptr = NULL;*/
-
-    retval = snm_info_add_sn(info, supernodes->list_head);
-
-    return retval;
+    /* Update list of communities from recvd from a supernode */
+    if (GET_C(hdr->flags))
+    {
+        for (i = 0; i < rsp->comm_num; i++)
+        {
+            update_communities(communities, &rsp->comm_ptr[i], sender);
+        }
+    }
 }
 
 /*******************************************************************
@@ -733,9 +679,16 @@ static int snm_adv_add_comm(n2n_SNM_ADV_t *adv, struct comm_info *communities)
     return communities_to_array(&adv->comm_num, &adv->comm_ptr, communities);
 }
 
-int build_snm_adv(int sock, comm_list_t *communities, n2n_SNM_ADV_t *adv)
+int build_snm_adv(int                 sock,
+                  struct comm_info   *comm_list,
+                  snm_hdr_t          *hdr,
+                  n2n_SNM_ADV_t      *adv)
 {
     int retval = 0;
+
+    hdr->type    = SNM_TYPE_ADV_MSG;
+    hdr->flags   = 0;
+    hdr->seq_num = 0;
 
     memset(adv, 0, sizeof(n2n_SNM_ADV_t));
 
@@ -748,9 +701,10 @@ int build_snm_adv(int sock, comm_list_t *communities, n2n_SNM_ADV_t *adv)
 
     sn_cpy(&adv->sn, (n2n_sock_t *) sa);
 
-    if (communities)
+    if (comm_list)
     {
-        retval += snm_adv_add_comm(adv, communities->list_head);
+        SET_N(hdr->flags);
+        retval += snm_adv_add_comm(adv, comm_list);
     }
 
     return retval;
@@ -762,12 +716,21 @@ void clear_snm_adv(n2n_SNM_ADV_t *adv)
     free_communities(&adv->comm_ptr);
 }
 
-void process_snm_adv(sn_list_t *supernodes, struct peer_info *edges, n2n_SNM_ADV_t *adv)
+void process_snm_adv(sn_list_t         *supernodes,
+                     comm_list_t       *communities,
+                     n2n_sock_t        *sn,
+                     n2n_SNM_ADV_t     *adv)
 {
     int i;
 
+    /* Adjust advertising address */
+    if (sn_is_zero_addr(&adv->sn))
+    {
+        sn_cpy_addr(&adv->sn, sn);
+    }
+
     /* Add senders address */
-    int need_write = update_supernodes(supernodes, &adv->sn);
+    int need_write = update_supernodes(supernodes, sn);
     if (need_write)
     {
         /* elements added */
@@ -777,6 +740,52 @@ void process_snm_adv(sn_list_t *supernodes, struct peer_info *edges, n2n_SNM_ADV
     /* Update list of communities from recvd from a supernode */
     for (i = 0; i < adv->comm_num; i++)
     {
-        /*update_comm_list(communities, 1, &adv->comm_ptr[i])*/;
+        update_communities(communities, &adv->comm_ptr[i], sn);
     }
+}
+
+
+/*******************************************************************
+ *                            Utils                                *
+ *******************************************************************/
+
+int sn_cmp(const n2n_sock_t *left, const n2n_sock_t *right)
+{
+    if (left->family != right->family)
+        return (left->family - right->family);
+    else if (left->port != right->port)
+            return (left->port - right->port);
+    else if (left->family == AF_INET)
+        return memcmp(left->addr.v4, right->addr.v4, IPV4_SIZE);
+
+    return memcmp(left->addr.v6, right->addr.v6, IPV6_SIZE);
+}
+
+void sn_cpy_addr(n2n_sock_t *dst, const n2n_sock_t *src)
+{
+    dst->family = src->family;
+    if (src->family == AF_INET)
+        memcpy(dst->addr.v4, src->addr.v4, IPV4_SIZE);
+    else
+        memcpy(dst->addr.v6, src->addr.v6, IPV6_SIZE);
+}
+
+void sn_cpy(n2n_sock_t *dst, const n2n_sock_t *src)
+{
+    dst->port = src->port;
+    sn_cpy_addr(dst, src);
+}
+
+int sn_is_zero_addr(n2n_sock_t *sn)
+{
+    int i = (sn->family == AF_INET ? (IPV4_SIZE - 1) : (IPV6_SIZE - 1));
+
+    for (; i >= 0; --i)
+    {
+        if (sn->addr.v6[i] != 0)
+            return 0;
+    }
+
+    //return (*((unsigned int *) sn->addr.v4) == 0);
+    return 1;
 }

@@ -363,8 +363,17 @@ int encode_REGISTER_SUPER_ACK( uint8_t * base,
     retval += encode_uint8( base, idx, reg->num_sn );
     if ( reg->num_sn > 0 )
     {
+#ifdef N2N_MULTIPLE_SUPERNODES
+        int i;
+
+        for(i = 0; i < reg->num_sn; i++)
+        {
+            retval += encode_sock( base, idx, &(reg->sn_bak[i]) );
+        }
+#else
         /* We only support 0 or 1 at this stage */
         retval += encode_sock( base, idx, &(reg->sn_bak) );
+#endif
     }
 
     return retval;
@@ -390,8 +399,17 @@ int decode_REGISTER_SUPER_ACK( n2n_REGISTER_SUPER_ACK_t * reg,
     retval += decode_uint8( &(reg->num_sn), base, rem, idx );
     if ( reg->num_sn > 0 )
     {
+#ifdef N2N_MULTIPLE_SUPERNODES
+        int i;
+
+        for(i = 0; i < reg->num_sn; i++)
+        {
+            retval += decode_sock( &(reg->sn_bak[i]), base, rem, idx );
+        }
+#else
         /* We only support 0 or 1 at this stage */
         retval += decode_sock( &(reg->sn_bak), base, rem, idx );
+#endif
     }
 
     return retval;

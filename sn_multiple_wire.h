@@ -128,17 +128,6 @@ int decode_SNM_REQ( n2n_SNM_REQ_t    *pkt,
                     size_t *rem,
                     size_t *idx );
 
-int encode_SNM_EDGE_REQ( uint8_t *base,
-                         size_t  *idx,
-                         const n2n_common_t  *cmn,
-                         const n2n_SNM_REQ_t *req );
-
-int decode_SNM_EDGE_REQ( n2n_SNM_REQ_t       *pkt,
-                         const n2n_common_t  *cmn,
-                         const uint8_t       *base,
-                         size_t *rem,
-                         size_t *idx );
-
 int encode_SNM_INFO( uint8_t *base,
                      size_t  *idx,
                      const snm_hdr_t      *hdr,
@@ -149,17 +138,6 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
                      const uint8_t    *base,
                      size_t * rem,
                      size_t * idx );
-
-int encode_SNM_EDGE_INFO( uint8_t *base,
-                          size_t  *idx,
-                          const n2n_common_t   *hdr,
-                          const n2n_SNM_INFO_t *info );
-
-int decode_SNM_EDGE_INFO( n2n_SNM_INFO_t      *pkt,
-                          const n2n_common_t  *hdr,
-                          const uint8_t       *base,
-                          size_t * rem,
-                          size_t * idx );
 
 int encode_SNM_ADV( uint8_t *base,
                     size_t  *idx,

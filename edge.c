@@ -84,7 +84,6 @@ typedef char n2n_sn_name_t[N2N_EDGE_SN_HOST_SIZE];
 
 #ifdef N2N_MULTIPLE_SUPERNODES
     #define N2N_EDGE_NUM_SUPERNODES           N2N_MAX_SN_PER_COMM
-    #define N2N_SUPER_DISCOVERY_INTERVAL      3//60   /* seconds */
 #else
     #define N2N_EDGE_NUM_SUPERNODES 2
 #endif
@@ -1042,8 +1041,7 @@ static void send_grat_arps(n2n_edge_t * eee,) {
 static int load_supernodes(n2n_edge_t *eee)
 {
     int i;
-    n2n_sock_t     sn;
-    n2n_sock_str_t sn_str;
+    n2n_sock_t sn;
 
     /* read the supernode addresses from file */
     sprintf(eee->supernodes.filename, "SUPERNODES");
@@ -1085,6 +1083,22 @@ static int load_supernodes(n2n_edge_t *eee)
     }
 
     return eee->sn_num;
+}
+
+static int add_supernode(n2n_edge_t *eee, n2n_sock_t *sn)
+{
+    if (eee->sn_num == N2N_EDGE_NUM_SUPERNODES)
+        return -1; //TODO log
+
+    n2n_sock_str_t sock_str;
+    sock_to_cstr(sock_str, sn);
+
+    strncpy((eee->sn_ip_array[eee->sn_num]), sock_str, N2N_EDGE_SN_HOST_SIZE);
+    traceEvent(TRACE_DEBUG, "Added supernode[%u] = %s\n", eee->sn_num, sock_str);
+
+    ++eee->sn_num;
+
+    return 0;
 }
 
 static void edge_send_snm_req(n2n_edge_t *eee, n2n_sock_t *sn);
@@ -1244,21 +1258,14 @@ static void readFromSNMSocket(n2n_edge_t *eee)
 
         if (supernode_accepted)
         {
-            n2n_sock_str_t sock_str;
-
-            int sn_num = MIN(info.sn_num, N2N_EDGE_NUM_SUPERNODES);
-
             /* clear supernodes list */
             clear_sn_list(&eee->supernodes.list_head);
             eee->supernodes.bin_size = 0;
 
-            for (i = 0; i < sn_num; i++)
+            for (i = 0; i < info.sn_num; i++)
             {
-                sock_to_cstr(sock_str, &info.sn_ptr[i]);
-                strncpy((eee->sn_ip_array[eee->sn_num]), sock_str, N2N_EDGE_SN_HOST_SIZE);
-                traceEvent(TRACE_DEBUG, "Added supernode[%u] = %s\n", eee->sn_num, sock_str);
-
-                ++eee->sn_num;
+                if (add_supernode(eee, &info.sn_ptr[i]))
+                    break;
 
                 update_supernodes(&eee->supernodes, &info.sn_ptr[i]);
             }
@@ -1290,22 +1297,13 @@ static void readFromSNMSocket(n2n_edge_t *eee)
         decode_SNM_ADV(&adv, &hdr, udp_buf, &rem, &idx);
         log_SNM_ADV(&adv);
 
-        n2n_sock_str_t sock_str;
-
-        if (eee->sn_num == N2N_EDGE_NUM_SUPERNODES)
-            return;//TODO log
-
-        /* Quick fix for IPv4 TODO */
-        if (adv.sn.family == AF_INET && *((unsigned int *) adv.sn.addr.v4) == 0)
+        if (sn_is_zero_addr(&adv.sn))
         {
-            memcpy(adv.sn.addr.v4, sender.addr.v4, IPV4_SIZE);
+            sn_cpy_addr(&adv.sn, &sender);
         }
 
-        sock_to_cstr(sock_str, &adv.sn);
-        strncpy((eee->sn_ip_array[eee->sn_num]), sock_str, N2N_EDGE_SN_HOST_SIZE);
-        traceEvent(TRACE_DEBUG, "Added supernode[%u] = %s\n", eee->sn_num, sock_str);
-
-        ++eee->sn_num;
+        if (add_supernode(eee, &adv.sn))
+            return;
 
         /* Save */
         update_supernodes(&eee->supernodes, &adv.sn);
@@ -2042,8 +2040,19 @@ static void readFromIPSocket( n2n_edge_t * eee )
                 {
                     if ( ra.num_sn > 0 )
                     {
+#ifdef N2N_MULTIPLE_SUPERNODES
+                        for (i = 0; i < ra.num_sn; i++)
+                        {
+                            if (add_supernode(eee, &ra.sn_bak[i]))
+                                break;
+
+                            traceEvent(TRACE_NORMAL, "Rx REGISTER_SUPER_ACK backup supernode at %s",
+                                       sock_to_cstr(sockbuf1, &(ra.sn_bak[i])));
+                        }
+#else
                         traceEvent(TRACE_NORMAL, "Rx REGISTER_SUPER_ACK backup supernode at %s",
                                    sock_to_cstr(sockbuf1, &(ra.sn_bak) ) );
+#endif
                     }
 
                     eee->last_sup = now;

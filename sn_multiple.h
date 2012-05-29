@@ -18,6 +18,8 @@
 #define N2N_MAX_SN_PER_COMM             4
 #define N2N_MAX_COMM_PER_SN             3
 
+#define N2N_SUPER_DISCOVERY_INTERVAL    3//60   /* seconds */
+
 #define N2N_SNM_EDGE_STATE_DISCOVERY    0
 #define N2N_SNM_EDGE_STATE_REQ_ADV      1
 #define N2N_SNM_EDGE_STATE_READY        2
@@ -40,7 +42,6 @@ typedef struct sn_list
 } sn_list_t;
 
 /* Operations on sn_info lists. */
-void sn_cpy(n2n_sock_t *dst, const n2n_sock_t *src);
 
 int read_sn_list_from_file( const char *filename, struct sn_info **list );
 int write_sn_list_to_file( const char *filename, struct sn_info *list );
@@ -83,11 +84,13 @@ void comm_reverse_list( struct comm_info **list );
 struct comm_info *find_comm( struct comm_info *list,
                              n2n_community_t   comm_name,
                              size_t            comm_name_len );
-int update_comm_list( comm_list_t       *comm_list,
-                      size_t             sn_num,
-                      snm_comm_name_t   *community_name );
+int update_communities( comm_list_t       *communities,
+                        snm_comm_name_t   *community_name,
+                        n2n_sock_t        *supernode );
 
-int update_communities( comm_list_t *communities, n2n_community_t comm_name );
+int add_new_community(comm_list_t        *communities,
+                      n2n_community_t     comm_name,
+                      struct comm_info  **comm);
 
 /*******************************************************************
  *                   SNM INFO related functions                    *
@@ -102,20 +105,33 @@ int build_snm_info(sn_list_t       *supernodes,
                    n2n_SNM_INFO_t  *info);
 void clear_snm_info(n2n_SNM_INFO_t *info);
 
-void process_snm_rsp(sn_list_t        *supernodes,
-                     comm_list_t      *communities,
-                     n2n_SNM_INFO_t   *snm_info);
-
-int build_snm_edge_info( sn_list_t *supernodes, comm_list_t *communities,
-                         n2n_common_t *req_hdr, n2n_SNM_INFO_t *info );
+void process_snm_rsp( sn_list_t       *supernodes,
+                      comm_list_t     *communities,
+                      n2n_sock_t      *sender,
+                      snm_hdr_t       *hdr,
+                      n2n_SNM_INFO_t  *rsp );
 
 /*******************************************************************
  *                    SNM ADV related functions                    *
  *******************************************************************/
-int build_snm_adv(int sock, comm_list_t *communities, n2n_SNM_ADV_t *adv);//TODO maybe add hdr also
+int build_snm_adv(int                 sock,
+                  struct comm_info   *comm_list,
+                  snm_hdr_t          *hdr,
+                  n2n_SNM_ADV_t      *adv);
 void clear_snm_adv(n2n_SNM_ADV_t *adv);
-void process_snm_adv(sn_list_t *supernodes, struct peer_info *edges, n2n_SNM_ADV_t *adv);
+void process_snm_adv(sn_list_t         *supernodes,
+                     comm_list_t       *communities,
+                     n2n_sock_t        *sn,
+                     n2n_SNM_ADV_t     *adv);
 
-/*void send_snm_req(int sock, n2n_sock_t *sn);*/
+/*******************************************************************
+ *                            Utils                                *
+ *******************************************************************/
+
+int  sn_cmp(const n2n_sock_t *left, const n2n_sock_t *right);
+void sn_cpy_addr(n2n_sock_t *dst, const n2n_sock_t *src);
+void sn_cpy(n2n_sock_t *dst, const n2n_sock_t *src);
+int  sn_is_zero_addr(n2n_sock_t *sn);
+
 
 #endif /*SN_MULTIPLE_H_ */

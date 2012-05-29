@@ -389,7 +389,7 @@ static void test_ADV()
                          (rand_func) rand_comm, (add_func) comm_list_add);
 
     int sock = open_socket(45555, 1);
-    build_snm_adv(sock, &communities, &adv);
+    build_snm_adv(sock, &communities, &hdr, &adv);
     closesocket(sock);
 
     if (test_SNM_MSG(sizeof(n2n_SNM_ADV_t),

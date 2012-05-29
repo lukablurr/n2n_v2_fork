@@ -170,7 +170,12 @@ struct n2n_REGISTER_SUPER_ACK
     uint8_t             num_sn;         /* Number of supernodes that were send
                                          * even if we cannot store them all. If
                                          * non-zero then sn_bak is valid. */
+
+#ifdef N2N_MULTIPLE_SUPERNODES
+    n2n_sock_t          sn_bak[4];
+#else
     n2n_sock_t          sn_bak;         /* Socket of the first backup supernode */
+#endif
 
 };
 
