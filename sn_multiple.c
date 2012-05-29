@@ -209,7 +209,6 @@ int update_supernodes(sn_list_t *supernodes, n2n_sock_t *sn)
     }
 
     new->last_seen = 0;
-    supernodes->bin_size += item_size;
 
     return 1;
 }
@@ -502,7 +501,10 @@ int update_communities( comm_list_t       *communities,
         return -1;
     }
 
-    sn_cpy(&ci->sn_sock[ci->sn_num++], supernode);
+    if (supernode)
+    {
+        sn_cpy(&ci->sn_sock[ci->sn_num++], supernode);
+    }
 
     return 0;
 }
@@ -665,7 +667,7 @@ void process_snm_rsp( sn_list_t       *supernodes,
     {
         for (i = 0; i < rsp->comm_num; i++)
         {
-            update_communities(communities, &rsp->comm_ptr[i], sender);
+            update_communities(communities, &rsp->comm_ptr[i], NULL);
         }
     }
 }
@@ -722,6 +724,7 @@ void process_snm_adv(sn_list_t         *supernodes,
                      n2n_SNM_ADV_t     *adv)
 {
     int i;
+    struct comm_info *ci = NULL;
 
     /* Adjust advertising address */
     if (sn_is_zero_addr(&adv->sn))
@@ -740,7 +743,14 @@ void process_snm_adv(sn_list_t         *supernodes,
     /* Update list of communities from recvd from a supernode */
     for (i = 0; i < adv->comm_num; i++)
     {
-        update_communities(communities, &adv->comm_ptr[i], sn);
+        ci = find_comm(communities->list_head,
+                       adv->comm_ptr[i].name,
+                       adv->comm_ptr[i].size);
+
+        if (!ci)
+            continue;
+
+        sn_cpy(&ci->sn_sock[ci->sn_num++], &adv->sn);
     }
 }
 

@@ -20,9 +20,9 @@
 
 #define N2N_SUPER_DISCOVERY_INTERVAL    3//60   /* seconds */
 
-#define N2N_SNM_EDGE_STATE_DISCOVERY    0
-#define N2N_SNM_EDGE_STATE_REQ_ADV      1
-#define N2N_SNM_EDGE_STATE_READY        2
+#define N2N_SNM_STATE_DISCOVERY    0
+#define N2N_SNM_STATE_REQ_ADV      1
+#define N2N_SNM_STATE_READY        2
 
 
 struct sn_info
@@ -31,13 +31,11 @@ struct sn_info
     n2n_sock_t          sn;
     size_t              communities_num;
     time_t              last_seen;
-    //TODO set listening port also
 };
 
 typedef struct sn_list
 {
     struct sn_info     *list_head;
-    size_t              bin_size;
     char                filename[N2N_PERSIST_FILENAME_LEN];
 } sn_list_t;
 
@@ -64,13 +62,11 @@ struct comm_info
     size_t              sn_num;
     n2n_sock_t          sn_sock[N2N_MAX_SN_PER_COMM];
     n2n_community_t     community_name;
-   /*time_t              last_seen;*/
 };
 
 typedef struct comm_list
 {
     struct comm_info   *list_head;
-    size_t              bin_size;
     char                filename[N2N_PERSIST_FILENAME_LEN];
 } comm_list_t;
 
