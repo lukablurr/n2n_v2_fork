@@ -667,7 +667,7 @@ void process_snm_rsp( sn_list_t       *supernodes,
     {
         for (i = 0; i < rsp->comm_num; i++)
         {
-            update_communities(communities, &rsp->comm_ptr[i], NULL);
+            update_communities(communities, &rsp->comm_ptr[i], sender);
         }
     }
 }
