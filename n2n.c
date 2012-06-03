@@ -122,7 +122,7 @@ void traceEvent(int eventTraceLevel, char* file, int line, char * format, ...) {
       snprintf(out_buf, sizeof(out_buf), "%s%s", extra_msg, buf);
       syslog(LOG_INFO, "%s", out_buf);
     } else {
-      snprintf(out_buf, sizeof(out_buf), "%s [%11s:%4d] %s%s", theDate, file, line, extra_msg, buf);
+      snprintf(out_buf, sizeof(out_buf), "%s [%18s:%4d] %s%s", theDate, file, line, extra_msg, buf);
       printf("%s\n", out_buf);
       fflush(stdout);
     }
