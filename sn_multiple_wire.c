@@ -167,7 +167,7 @@ int encode_SNM_INFO( uint8_t *base,
             retval += encode_sock(base, idx, &info->sn_ptr[i]);
         }
     }
-    if (GET_C(hdr->flags))
+    if (GET_C(hdr->flags) || GET_N(hdr->flags))
     {
         for (i = 0; i < info->comm_num; i++)
         {
@@ -202,7 +202,7 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
             retval += decode_sock(&pkt->sn_ptr[i], base, rem, idx);
         }
     }
-    if (GET_C(hdr->flags))
+    if (GET_C(hdr->flags) || GET_N(hdr->flags))
     {
         if (alloc_communities(&pkt->comm_ptr, pkt->comm_num))
         {
