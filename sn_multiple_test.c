@@ -311,10 +311,18 @@ static int sn_cmp_timestamp_asc(struct sn_info *l, struct sn_info *r)
 
 static void test_sn_sort(struct sn_info **list)
 {
-    *list = merge_sort(list, sn_list_size(*list), sn_cmp_timestamp_asc);
+    struct sn_info *sni = *list;
+    while (sni)
+    {
+        /* set random timestamps */
+        sni->last_seen = random();
+        sni = sni->next;
+    }
+
+    sn_list_sort(list, sn_cmp_timestamp_asc);
 
     int prev_last_seen = 0;
-    struct sn_info *sni = *list;
+    sni = *list;
 
     while (sni)
     {
@@ -324,6 +332,8 @@ static void test_sn_sort(struct sn_info **list)
             return;
         }
 
+        //traceEvent(TRACE_NORMAL, "--- %d", sni->last_seen);
+        prev_last_seen = sni->last_seen;
         sni = sni->next;
     }
 
