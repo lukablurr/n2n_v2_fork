@@ -30,7 +30,7 @@ struct sn_info
     struct sn_info     *next;
     n2n_sock_t          sn;
     size_t              communities_num;
-    time_t              last_seen;
+    time_t              timestamp;
 };
 
 typedef struct sn_list

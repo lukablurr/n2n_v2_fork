@@ -306,7 +306,7 @@ static void test_REQ_LIST()
 
 static int sn_cmp_timestamp_asc(struct sn_info *l, struct sn_info *r)
 {
-    return (l->last_seen - r->last_seen);
+    return (l->timestamp - r->timestamp);
 }
 
 static void test_sn_sort(struct sn_info **list)
@@ -315,7 +315,7 @@ static void test_sn_sort(struct sn_info **list)
     while (sni)
     {
         /* set random timestamps */
-        sni->last_seen = random();
+        sni->timestamp = random();
         sni = sni->next;
     }
 
@@ -326,14 +326,14 @@ static void test_sn_sort(struct sn_info **list)
 
     while (sni)
     {
-        if (sni->last_seen < prev_last_seen)
+        if (sni->timestamp < prev_last_seen)
         {
             traceEvent(TRACE_ERROR, "Sort testing failed");
             return;
         }
 
         //traceEvent(TRACE_NORMAL, "--- %d", sni->last_seen);
-        prev_last_seen = sni->last_seen;
+        prev_last_seen = sni->timestamp;
         sni = sni->next;
     }
 

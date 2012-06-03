@@ -199,7 +199,7 @@ int update_supernodes(sn_list_t *supernodes, n2n_sock_t *sn)
     if (!new_one)
     {
         /* existing supernode */
-        si->last_seen = time(NULL);
+        si->timestamp = time(NULL);
     }
     else
         traceEvent(TRACE_DEBUG, "Added supernode %s", sock_to_cstr(sock_str, sn));

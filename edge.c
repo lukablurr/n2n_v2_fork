@@ -1083,7 +1083,7 @@ static int load_supernodes(n2n_edge_t *eee)
 
         /* set registering supernode */
         supernode2addr(&eee->reg_sn.sn, eee->sn_ip_array[0]);
-        eee->reg_sn.last_seen = 0;
+        eee->reg_sn.timestamp = 0;
 
         eee->snm_discovery_state = N2N_SNM_STATE_READY;
     }
@@ -1120,12 +1120,14 @@ static void edge_send_snm_req(n2n_edge_t *eee, n2n_sock_t *sn);
 
 static int sn_rank(struct sn_info *sni)
 {
-    return sni->last_seen;
+    int delta = N2N_MAX_COMM_PER_SN - sni->communities_num;
+    delta = MAX(delta, 1);
+    return (sni->timestamp * 100 / delta);
 }
 
-static int sn_cmp_rank_desc(struct sn_info *l, struct sn_info *r)
+static int sn_cmp_rank_asc(struct sn_info *l, struct sn_info *r)
 {
-    return -(sn_rank(l) - sn_rank(r));
+    return (sn_rank(l) - sn_rank(r));
 }
 
 static void supernodes_discovery(n2n_edge_t *eee, time_t nowTime)
@@ -1140,7 +1142,7 @@ static void supernodes_discovery(n2n_edge_t *eee, time_t nowTime)
 
     if (eee->snm_discovery_state == N2N_SNM_STATE_DISCOVERY)
     {
-        sn_list_sort(&eee->supernodes.list_head, sn_cmp_rank_desc);
+        sn_list_sort(&eee->supernodes.list_head, sn_cmp_rank_asc);
 
         /* save the best supernodes */
         i   = 0;
@@ -1229,6 +1231,7 @@ static void readFromSNMSocket(n2n_edge_t *eee)
     n2n_sock_str_t      sockbuf;
 
     size_t              i;
+    time_t              now = time(NULL);
 
     i = sizeof(sender_sock);
     recvlen = recvfrom(eee->snm_sock, udp_buf, N2N_PKT_BUF_SIZE, 0/*flags*/,
@@ -1295,14 +1298,17 @@ static void readFromSNMSocket(n2n_edge_t *eee)
 
             struct sn_info *sni = sn_find(eee->supernodes.list_head, &sender);
             sni->communities_num = info.comm_num;
-            sni->last_seen = time(NULL);
+            sni->timestamp = now - sni->timestamp; /* set response time */
 
             for (i = 0; i < info.sn_num; i++)
             {
-                if (!sn_find(eee->supernodes.list_head, &info.sn_ptr[i]))
+                n2n_sock_t *sn = &info.sn_ptr[i];
+
+                if (!sn_find(eee->supernodes.list_head, sn))
                 {
-                    sn_list_add_create(&eee->supernodes.list_head, &info.sn_ptr[i]);
-                    edge_send_snm_req(eee, &info.sn_ptr[i]);
+                    sni = sn_list_add_create(&eee->supernodes.list_head, sn);
+                    sni->timestamp = now;
+                    edge_send_snm_req(eee, sn);
                 }
             }
         }
@@ -1327,7 +1333,7 @@ static void readFromSNMSocket(n2n_edge_t *eee)
             supernode2addr(&eee->supernode, eee->sn_ip_array[eee->sn_idx]);
 
             eee->reg_sn.sn = eee->supernode;
-            eee->reg_sn.last_seen = 0;
+            eee->reg_sn.timestamp = 0;
         }
 
         eee->snm_discovery_state = N2N_SNM_STATE_READY;
@@ -1366,7 +1372,7 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
         }
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-        if (eee->reg_sn.last_seen < eee->last_register_req)
+        if (eee->reg_sn.timestamp < eee->last_register_req)
 #endif
         traceEvent(TRACE_WARNING, "Supernode not responding - moving to %u of %u", 
                    (unsigned int)eee->sn_idx, (unsigned int)eee->sn_num );
@@ -1379,7 +1385,7 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
     }
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-    if (eee->reg_sn.last_seen < eee->last_register_req &&  /* supernode didn't respond */
+    if (eee->reg_sn.timestamp < eee->last_register_req &&  /* supernode didn't respond */
         sn_cmp(&eee->supernode, &eee->reg_sn.sn) == 0)     /* supernode is the main one */
     {
         supernode2addr(&(eee->supernode), eee->sn_ip_array[eee->sn_idx]);
@@ -1389,7 +1395,7 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
 
     /* setting next supernode to register to */
     supernode2addr(&(eee->reg_sn.sn), eee->sn_ip_array[eee->sn_idx]);
-    eee->reg_sn.last_seen = 0;
+    eee->reg_sn.timestamp = 0;
     send_register_super(eee, &(eee->reg_sn.sn));
 
 #else
@@ -2093,7 +2099,7 @@ static void readFromIPSocket( n2n_edge_t * eee )
                     eee->sn_wait=0;
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-                    eee->reg_sn.last_seen = now; //TODO check if sending sn is reg_sn
+                    eee->reg_sn.timestamp = now; //TODO check if sending sn is reg_sn
                     eee->sup_attempts = 0;                     /* we got a response, so no more attempts */
 #else
                     eee->sup_attempts = N2N_EDGE_SUP_ATTEMPTS; /* refresh because we got a response */
