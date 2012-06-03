@@ -332,36 +332,37 @@ static void test_sn_sort(struct sn_info **list)
 
 static void test_INFO()
 {
-    snm_hdr_t      hdr = {SNM_TYPE_REQ_LIST_MSG, 0, 3134};
+    snm_hdr_t      req_hdr = {SNM_TYPE_REQ_LIST_MSG, 0, 3134};
     n2n_SNM_REQ_t  req;
+    snm_hdr_t      rsp_hdr;
     n2n_SNM_INFO_t rsp;
     size_t         size = 0;
 
     traceEvent( TRACE_NORMAL, "---- Testing SNM INFO message" );
 
-    SET_S(hdr.flags);
-    SET_C(hdr.flags);
+    SET_S(req_hdr.flags);
+    SET_C(req_hdr.flags);
 
-    sn_list_t supernodes = { NULL, 0 };
+    sn_list_t supernodes = { NULL, {0} };
     generate_random_list((void **) &supernodes.list_head, sizeof(struct sn_info),
                          (rand_func) rand_sn, (add_func) sn_list_add);
 
-    comm_list_t communities = { NULL, 0 };
+    comm_list_t communities = { NULL, NULL, {0} };
     generate_random_list((void **) &communities.list_head, sizeof(struct comm_info),
                          (rand_func) rand_comm, (add_func) comm_list_add);
 
     test_sn_sort(&supernodes.list_head);
 
-    build_snm_info(&supernodes, &communities, &hdr, &req, &rsp);
+    build_snm_info(0, &supernodes, &communities, &req_hdr, &req, &rsp_hdr, &rsp);
     clear_sn_list(&supernodes.list_head);
     clear_comm_list(&communities.list_head);
-    hdr.type = SNM_TYPE_RSP_LIST_MSG;
+    req_hdr.type = SNM_TYPE_RSP_LIST_MSG;
 
-    log_SNM_hdr(&hdr);
+    log_SNM_hdr(&req_hdr);
     log_SNM_INFO(&rsp);
 
     if (test_SNM_MSG(sizeof(n2n_SNM_INFO_t),
-                     &hdr, &rsp, size,
+                     &req_hdr, &rsp, size,
                      (enc_func) encode_SNM_INFO,
                      (dec_func) decode_SNM_INFO,
                      cmp_SNM_INFO))
@@ -389,7 +390,7 @@ static void test_ADV()
                          (rand_func) rand_comm, (add_func) comm_list_add);
 
     int sock = open_socket(45555, 1);
-    build_snm_adv(sock, &communities, &hdr, &adv);
+    build_snm_adv(sock, communities.list_head, &hdr, &adv);
     closesocket(sock);
 
     if (test_SNM_MSG(sizeof(n2n_SNM_ADV_t),
