@@ -658,7 +658,6 @@ static int process_sn_msg( n2n_sn_t *sss,
         if (GET_A(hdr.flags))
         {
             /* request for ADV */
-            send_snm_adv(sss, &sender_sn, NULL);
 
             if (GET_E(hdr.flags))
             {
@@ -681,6 +680,8 @@ static int process_sn_msg( n2n_sn_t *sss,
                     advertise_community_to_all(sss, ci->community_name);
                 }
             }
+
+            send_snm_adv(sss, &sender_sn, NULL);
         }
         else
         {
