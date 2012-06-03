@@ -50,7 +50,9 @@ void sn_reverse_list( struct sn_info **list );
 struct sn_info *sn_find( struct sn_info *list, const n2n_sock_t *sn );
 
 struct sn_info *sn_list_add_create(struct sn_info **list, n2n_sock_t *sn);
+int sn_list_add_new(struct sn_info **list, n2n_sock_t *sn_sock, struct sn_info **out_item);
 int update_supernodes( sn_list_t *supernodes, n2n_sock_t *sn );
+int update_and_save_supernodes(sn_list_t *supernodes, n2n_sock_t *sn_array, int sn_num);
 
 typedef int (*sn_cmp_func)(struct sn_info *l, struct sn_info *r);
 struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func);
@@ -67,6 +69,7 @@ struct comm_info
 typedef struct comm_list
 {
     struct comm_info   *list_head;
+    struct comm_info   *persist;
     char                filename[N2N_PERSIST_FILENAME_LEN];
 } comm_list_t;
 
@@ -77,7 +80,7 @@ void comm_list_add( struct comm_info **list, struct comm_info *new );
 size_t clear_comm_list( struct comm_info **comm_list );
 size_t comm_list_size( const struct comm_info *list );
 void comm_reverse_list( struct comm_info **list );
-struct comm_info *find_comm( struct comm_info *list,
+struct comm_info *comm_find( struct comm_info *list,
                              n2n_community_t   comm_name,
                              size_t            comm_name_len );
 int update_communities( comm_list_t       *communities,
@@ -93,15 +96,16 @@ int add_new_community(comm_list_t        *communities,
  *******************************************************************/
 int snm_info_add_sn( n2n_SNM_INFO_t *info, struct sn_info *supernodes );
 
-int build_snm_info(sn_list_t       *supernodes,
-                   comm_list_t     *communities,
-                   snm_hdr_t       *req_hdr,
-                   n2n_SNM_REQ_t   *req,
-                   snm_hdr_t       *info_hdr,
-                   n2n_SNM_INFO_t  *info);
-void clear_snm_info(n2n_SNM_INFO_t *info);
+int build_snm_info( int              sock,         /* for ADV */
+                    sn_list_t       *supernodes,
+                    comm_list_t     *communities,
+                    snm_hdr_t       *req_hdr,
+                    n2n_SNM_REQ_t   *req,
+                    snm_hdr_t       *info_hdr,
+                    n2n_SNM_INFO_t  *info );
+void clear_snm_info(n2n_SNM_INFO_t  *info);
 
-void process_snm_rsp( sn_list_t       *supernodes,
+int  process_snm_rsp( sn_list_t       *supernodes,
                       comm_list_t     *communities,
                       n2n_sock_t      *sender,
                       snm_hdr_t       *hdr,
@@ -115,7 +119,7 @@ int build_snm_adv(int                 sock,
                   snm_hdr_t          *hdr,
                   n2n_SNM_ADV_t      *adv);
 void clear_snm_adv(n2n_SNM_ADV_t *adv);
-void process_snm_adv(sn_list_t         *supernodes,
+int  process_snm_adv(sn_list_t         *supernodes,
                      comm_list_t       *communities,
                      n2n_sock_t        *sn,
                      n2n_SNM_ADV_t     *adv);
@@ -128,6 +132,8 @@ int  sn_cmp(const n2n_sock_t *left, const n2n_sock_t *right);
 void sn_cpy_addr(n2n_sock_t *dst, const n2n_sock_t *src);
 void sn_cpy(n2n_sock_t *dst, const n2n_sock_t *src);
 int  sn_is_zero_addr(n2n_sock_t *sn);
+int  sn_is_loopback(n2n_sock_t *sn, uint16_t local_port); /* TODO hack until explicit binding */
+int  sn_local_addr(int sock, n2n_sock_t *sn);
 
 
 #endif /*SN_MULTIPLE_H_ */

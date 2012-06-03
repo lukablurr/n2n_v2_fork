@@ -405,6 +405,10 @@ static int process_mgmt( n2n_sn_t * sss,
 
 static int load_snm_info(n2n_sn_t *sss)
 {
+    /* load supernodes */
+    struct sn_info *cmd_line_list  = sss->supernodes.list_head;
+    sss->supernodes.list_head = NULL;
+
     sprintf(sss->supernodes.filename, "SN_SNM_%d", sss->sn_port);
     if (read_sn_list_from_file( sss->supernodes.filename,
                                &sss->supernodes.list_head))
@@ -413,9 +417,27 @@ static int load_snm_info(n2n_sn_t *sss)
         return -1;
     }
 
+    /* check if we had some new supernodes before reading from file */
+    int new_ones = 0;
+
+    struct sn_info *p = cmd_line_list;
+    while (p)
+    {
+        new_ones += update_supernodes(&sss->supernodes, &p->sn);
+        p = p->next;
+    }
+    clear_sn_list(&cmd_line_list);
+
+    if (new_ones)
+    {
+        write_sn_list_to_file(sss->supernodes.filename,
+                              sss->supernodes.list_head);
+    }
+
+    /* load communities */
     sprintf(sss->communities.filename, "SN_COMM_%d", sss->sn_port);
     if (read_comm_list_from_file( sss->communities.filename,
-                                 &sss->communities.list_head))
+                                 &sss->communities.persist))
     {
         traceEvent(TRACE_ERROR, "Failed to open communities file. %s", strerror(errno));
         return -1;
@@ -432,11 +454,34 @@ static int load_snm_info(n2n_sn_t *sss)
 
 static void send_snm_adv(n2n_sn_t *sss, n2n_sock_t *sn, struct comm_info *comm_list);
 
+static void advertise_all(n2n_sn_t *sss)
+{
+    struct sn_info *p = sss->supernodes.list_head;
+    while (p && sss->communities.list_head)
+    {
+        send_snm_adv(sss, &p->sn, sss->communities.list_head);
+        p = p->next;
+    }
+}
+
+static void advertise_community_to_all(n2n_sn_t *sss, const n2n_community_t community)
+{
+    struct comm_info ci;
+
+    memset(&ci, 0, sizeof(struct comm_info));
+    memcpy(ci.community_name, community, sizeof(n2n_community_t));
+
+    struct sn_info *p = sss->supernodes.list_head;
+
+    while (p)
+    {
+        send_snm_adv(sss, &p->sn, &ci);
+        p = p->next;
+    }
+}
+
 static void communities_discovery(n2n_sn_t *sss, time_t nowTime)
 {
-    int sn_num = 0;
-    struct comm_info *tmp_list = NULL, *crt = NULL, *prev = NULL;
-
     if (nowTime - sss->start_time < N2N_SUPER_DISCOVERY_INTERVAL)
     {
         return;
@@ -444,48 +489,31 @@ static void communities_discovery(n2n_sn_t *sss, time_t nowTime)
 
     if (sss->snm_discovery_state == N2N_SNM_STATE_DISCOVERY)
     {
-        crt = sss->communities.list_head;
+        struct comm_info *tmp_list = sss->communities.list_head;   /* queried communities */
+        sss->communities.list_head = sss->communities.persist;
 
-        while (sn_num < N2N_MAX_COMM_PER_SN && crt != NULL)
+        int comm_num = comm_list_size(sss->communities.persist);
+
+        /* add new communities */
+        struct comm_info *p = tmp_list;
+
+        while (comm_num < N2N_MAX_COMM_PER_SN && p != NULL)
         {
-            if (crt->sn_num < N2N_MIN_SN_PER_COMM)
+            if (p->sn_num < N2N_MIN_SN_PER_COMM)
             {
-                comm_list_add(&tmp_list, crt);
-
-                if (prev)
-                    prev->next = crt->next;
-                else
-                    sss->communities.list_head = crt->next;
-
-                sn_num++;
+                /* add new community without setting supernodes */
+                if (add_new_community(&sss->communities, p->community_name, NULL))
+                    comm_num++;
             }
-            else
-                prev = crt;
 
-            crt  = crt->next;
+            p = p->next;
         }
+        clear_comm_list(&tmp_list);
 
-        /* if none, give it another try */
-        if (sn_num == 0)
-            return;
-
-        clear_comm_list(&sss->communities.list_head);
-        sss->communities.list_head = tmp_list;
+        /* send ADV to all */
+        advertise_all(sss);
 
         sss->snm_discovery_state = N2N_SNM_STATE_READY;
-
-        /* send ADV */
-        crt = sss->communities.list_head;
-        while (crt)
-        {
-            for (sn_num = 0; sn_num < crt->sn_num; sn_num++)
-            {
-                send_snm_adv(sss, &crt->sn_sock[sn_num], crt);
-            }
-
-            crt->sn_num = 0; /* reset supernodes number */
-            crt = crt->next;
-        }
     }
 }
 
@@ -500,6 +528,9 @@ static void send_snm_req(n2n_sn_t         *sss,
     n2n_sock_str_t sockbuf;
     snm_hdr_t hdr = { SNM_TYPE_REQ_LIST_MSG, 0, ++sss->seq_num };
     n2n_SNM_REQ_t req = { 0, NULL };
+
+    if (sn_is_loopback(sn, sss->sn_port))
+        return;
 
     SET_S(hdr.flags);
 
@@ -545,7 +576,7 @@ static void send_snm_rsp(n2n_sn_t *sss, const n2n_sock_t *sock, snm_hdr_t *hdr, 
     snm_hdr_t rsp_hdr;
     n2n_SNM_INFO_t rsp;
 
-    build_snm_info(&sss->supernodes, &sss->communities, hdr, req, &rsp_hdr, &rsp);
+    build_snm_info(sss->sock, &sss->supernodes, &sss->communities, hdr, req, &rsp_hdr, &rsp);
 
     idx = 0;
     encode_SNM_INFO(pktbuf, &idx, &rsp_hdr, &rsp);
@@ -566,7 +597,13 @@ static void send_snm_adv(n2n_sn_t *sss, n2n_sock_t *sn, struct comm_info *comm_l
     snm_hdr_t hdr;
     n2n_SNM_ADV_t adv;
 
+    if (sn_is_loopback(sn, sss->sn_port))
+        return;
+
     build_snm_adv(sss->sock, comm_list, &hdr, &adv);
+
+    if (sss->snm_discovery_state != N2N_SNM_STATE_READY)
+        SET_A(hdr.flags);
 
     idx = 0;
     encode_SNM_ADV(pktbuf, &idx, &hdr, &adv);
@@ -608,6 +645,12 @@ static int process_sn_msg( n2n_sn_t *sss,
 
     if (msg_type == SNM_TYPE_REQ_LIST_MSG)
     {
+        if (sss->snm_discovery_state != N2N_SNM_STATE_READY)
+        {
+            traceEvent(TRACE_ERROR, "Received SNM REQ but supernode is NOT READY");
+            return -1;
+        }
+
         n2n_SNM_REQ_t req;
         decode_SNM_REQ(&req, &hdr, msg_buf, &rem, &idx);
         log_SNM_REQ(&req);
@@ -616,6 +659,28 @@ static int process_sn_msg( n2n_sn_t *sss,
         {
             /* request for ADV */
             send_snm_adv(sss, &sender_sn, NULL);
+
+            if (GET_E(hdr.flags))
+            {
+                /* request from edge wanting to register a new community */
+
+                if (req.comm_num != 1)
+                {
+                    traceEvent(TRACE_ERROR, "Received SNM REQ from edge with comm_num=%d", req.comm_num);
+                    return -1;
+                }
+
+                struct comm_info *ci;
+
+                int need_write = add_new_community(&sss->communities, req.comm_ptr[0].name, &ci);
+                if (need_write)
+                {
+                    write_comm_list_to_file(sss->communities.filename,
+                                            sss->communities.list_head);
+
+                    advertise_community_to_all(sss, ci->community_name);
+                }
+            }
         }
         else
         {
@@ -625,12 +690,7 @@ static int process_sn_msg( n2n_sn_t *sss,
 
         if (!GET_E(hdr.flags))
         {
-            int need_write = update_supernodes(&sss->supernodes, &sender_sn);
-            if (need_write)
-            {
-                write_sn_list_to_file(sss->supernodes.filename,
-                                      sss->supernodes.list_head);
-            }
+            update_and_save_supernodes(&sss->supernodes, &sender_sn, 1);
         }
     }
     else if (msg_type == SNM_TYPE_RSP_LIST_MSG)
@@ -645,7 +705,17 @@ static int process_sn_msg( n2n_sn_t *sss,
         decode_SNM_INFO(&rsp, &hdr, msg_buf, &rem, &idx);
         log_SNM_INFO(&rsp);
 
-        process_snm_rsp(&sss->supernodes, &sss->communities, &sender_sn, &hdr, &rsp);
+        int sn_num = process_snm_rsp(&sss->supernodes, &sss->communities,
+                                     &sender_sn, &hdr, &rsp);
+
+        /* send requests to the recently added supernodes */
+        struct sn_info *new_sn = sss->supernodes.list_head;
+        while (sn_num > 0 && new_sn)
+        {
+            send_snm_req(sss, &new_sn->sn, 1, NULL, 0);
+            new_sn = new_sn->next;
+            sn_num--;
+        }
     }
     else if (msg_type == SNM_TYPE_ADV_MSG)
     {
@@ -653,9 +723,15 @@ static int process_sn_msg( n2n_sn_t *sss,
         decode_SNM_ADV(&adv, &hdr, msg_buf, &rem, &idx);
         log_SNM_ADV(&adv);
 
-        process_snm_adv(&sss->supernodes, &sss->communities, &sender_sn, &adv);
+        int communities_updated = process_snm_adv(&sss->supernodes,
+                                                  &sss->communities,
+                                                  &sender_sn, &adv);
 
-        send_snm_adv(sss, &sender_sn, sss->communities.list_head);//TODO not all of them
+        if (communities_updated && GET_A(hdr.flags))
+        {
+            /* sending supernode is requesting ADV */
+            send_snm_adv(sss, &sender_sn, sss->communities.list_head);
+        }
 
         /* new supernode will be advertised on REG SUPER ACK */
     }
@@ -878,17 +954,13 @@ static int process_udp( n2n_sn_t * sss,
         update_edge( sss, reg.edgeMac, cmn.community, &(ack.sock), now );
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-        struct comm_info *ci = NULL;
-
-        int need_write = add_new_community(&sss->communities, cmn.community, &ci);
-        if (need_write)
+        struct comm_info *ci = comm_find(sss->communities.list_head,
+                                         cmn.community, strlen((const char *) cmn.community));
+        if (ci)
         {
-            write_comm_list_to_file(sss->communities.filename,
-                                    sss->communities.list_head);
+            ack.num_sn = ci->sn_num;
+            memcpy(&ack.sn_bak, ci->sn_sock, ci->sn_num * sizeof(n2n_sock_t));
         }
-
-        ack.num_sn = ci->sn_num;
-        memcpy(&ack.sn_bak, ci->sn_sock, ci->sn_num * sizeof(n2n_sock_t));
 #endif
 
         encode_REGISTER_SUPER_ACK( ackbuf, &encx, &cmn2, &ack );

@@ -139,6 +139,7 @@ struct n2n_edge
     uint8_t             snm_discovery_state;
     int                 snm_sock;
     sn_list_t           supernodes;
+    struct sn_info      reg_sn;
 #endif
 };
 
@@ -1055,7 +1056,7 @@ static int load_supernodes(n2n_edge_t *eee)
 
     if (sn_list_size(eee->supernodes.list_head) == 0)
     {
-        /* first startup */
+        /* first startup: save the sn addresses given as cmd line params */
 
         for (i = 0; i < eee->sn_num; ++i)
         {
@@ -1064,6 +1065,7 @@ static int load_supernodes(n2n_edge_t *eee)
             update_supernodes(&eee->supernodes, &sn);
         }
 
+        /* reset sn_ip_array */
         eee->sn_num = 0;
         memset(eee->sn_ip_array, 0, N2N_EDGE_NUM_SUPERNODES * sizeof(n2n_sn_name_t));
     }
@@ -1071,12 +1073,17 @@ static int load_supernodes(n2n_edge_t *eee)
     {
         eee->sn_num = 0;
 
+        /* fill sn_ip_array */
         struct sn_info *sni = eee->supernodes.list_head;
         while (sni)
         {
             sock_to_cstr(eee->sn_ip_array[eee->sn_num++], &sni->sn);
             sni = sni->next;
         }
+
+        /* set registering supernode */
+        supernode2addr(&eee->reg_sn.sn, eee->sn_ip_array[0]);
+        eee->reg_sn.last_seen = 0;
 
         eee->snm_discovery_state = N2N_SNM_STATE_READY;
     }
@@ -1092,7 +1099,7 @@ static int add_supernode(n2n_edge_t *eee, n2n_sock_t *sn)
         return -1;
     }
 
-    int new_one = update_supernodes(&eee->supernodes, sn);
+    int new_one = update_and_save_supernodes(&eee->supernodes, sn, 1);
 
     if (new_one)
     {
@@ -1100,10 +1107,6 @@ static int add_supernode(n2n_edge_t *eee, n2n_sock_t *sn)
         sock_to_cstr(sock_str, sn);
 
         strncpy((eee->sn_ip_array[eee->sn_num]), sock_str, N2N_EDGE_SN_HOST_SIZE);
-
-        /* save to file */
-        write_sn_list_to_file(eee->supernodes.filename,
-                              eee->supernodes.list_head);
 
         traceEvent(TRACE_DEBUG, "Added supernode[%u] = %s\n", eee->sn_num, sock_str);
 
@@ -1188,26 +1191,20 @@ static void edge_send_snm_req(n2n_edge_t *eee, n2n_sock_t *sn)
 
     hdr.type    = SNM_TYPE_REQ_LIST_MSG;
     hdr.seq_num = 0;
-    SET_E(hdr.flags);
+    SET_E(hdr.flags);   /* request from edge */
+    SET_N(hdr.flags);   /* request contains community name*/
 
     if (eee->snm_discovery_state == N2N_SNM_STATE_DISCOVERY)
-    {
-        SET_S(hdr.flags);
-        SET_N(hdr.flags);
-
-        comm.size = strlen((const char *) eee->community_name);
-        memcpy(comm.name, eee->community_name, comm.size);
-
-        req.comm_num = 1;
-        req.comm_ptr = &comm;
-    }
+        SET_S(hdr.flags);    /* request supernodes */
     else
-    {
-        SET_A(hdr.flags);
+        SET_A(hdr.flags);    /* request advertise */
 
-        req.comm_num = 0;
-        req.comm_ptr = NULL;
-    }
+    /* fill community name */
+    comm.size = strlen((const char *) eee->community_name);
+    memcpy(comm.name, eee->community_name, comm.size);
+
+    req.comm_num = 1;
+    req.comm_ptr = &comm;
 
     idx = 0;
     encode_SNM_REQ(pktbuf, &idx, &hdr, &req);
@@ -1281,7 +1278,12 @@ static void readFromSNMSocket(n2n_edge_t *eee)
 
             for (i = 0; i < info.sn_num; i++)
             {
-                if (add_supernode(eee, &info.sn_ptr[i]))
+                n2n_sock_t *sn = &info.sn_ptr[i];
+
+                if (sn_is_zero_addr(sn))
+                    sn_cpy_addr(sn, &sender);
+
+                if (add_supernode(eee, sn))
                     break;
             }
 
@@ -1323,6 +1325,9 @@ static void readFromSNMSocket(n2n_edge_t *eee)
         if (eee->sn_num == 1)
         {
             supernode2addr(&eee->supernode, eee->sn_ip_array[eee->sn_idx]);
+
+            eee->reg_sn.sn = eee->supernode;
+            eee->reg_sn.last_seen = 0;
         }
 
         eee->snm_discovery_state = N2N_SNM_STATE_READY;
@@ -1360,6 +1365,9 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
             eee->sn_idx=0;
         }
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+        if (eee->reg_sn.last_seen < eee->last_register_req)
+#endif
         traceEvent(TRACE_WARNING, "Supernode not responding - moving to %u of %u", 
                    (unsigned int)eee->sn_idx, (unsigned int)eee->sn_num );
 
@@ -1370,15 +1378,31 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
         --(eee->sup_attempts);
     }
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+    if (eee->reg_sn.last_seen < eee->last_register_req &&  /* supernode didn't respond */
+        sn_cmp(&eee->supernode, &eee->reg_sn.sn) == 0)     /* supernode is the main one */
+    {
+        supernode2addr(&(eee->supernode), eee->sn_ip_array[eee->sn_idx]);
+
+        traceEvent(TRACE_WARNING, "Changed active supernode to %s", eee->sn_ip_array[eee->sn_idx]);
+    }
+
+    /* setting next supernode to register to */
+    supernode2addr(&(eee->reg_sn.sn), eee->sn_ip_array[eee->sn_idx]);
+    eee->reg_sn.last_seen = 0;
+    send_register_super(eee, &(eee->reg_sn.sn));
+
+#else
     if(eee->re_resolve_supernode_ip || (eee->sn_num > 1) )
     {
         supernode2addr(&(eee->supernode), eee->sn_ip_array[eee->sn_idx] );
     }
 
+    send_register_super( eee, &(eee->supernode) );
+#endif
+
     traceEvent(TRACE_DEBUG, "Registering with supernode (%s) (attempts left %u)",
                supernode_ip(eee), (unsigned int)eee->sup_attempts);
-
-    send_register_super( eee, &(eee->supernode) );
 
     eee->sn_wait=1;
 
@@ -2067,7 +2091,13 @@ static void readFromIPSocket( n2n_edge_t * eee )
 
                     eee->last_sup = now;
                     eee->sn_wait=0;
+
+#ifdef N2N_MULTIPLE_SUPERNODES
+                    eee->reg_sn.last_seen = now; //TODO check if sending sn is reg_sn
+                    eee->sup_attempts = 0;                     /* we got a response, so no more attempts */
+#else
                     eee->sup_attempts = N2N_EDGE_SUP_ATTEMPTS; /* refresh because we got a response */
+#endif
 
                     /* REVISIT: store sn_back */
                     eee->register_lifetime = ra.lifetime;
