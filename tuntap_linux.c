@@ -17,8 +17,6 @@
 
 #include "n2n.h"
 
-#define SNM_EDGE_TEST
-
 #ifdef __linux__
 
 static void read_mac(char *ifname, n2n_mac_t mac_addr) {
