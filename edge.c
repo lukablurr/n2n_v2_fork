@@ -1286,6 +1286,19 @@ static void readFromSNMSocket(n2n_edge_t *eee)
         {
             /* supernode accepted community */
 
+            if (info.comm_num != 1)
+            {
+                traceEvent(TRACE_ERROR, "Invalid ADV response: Community number=%d",
+                           info.comm_num);
+                return;
+            }
+            if (memcmp(eee->community_name, info.comm_ptr[0].name, info.comm_ptr[0].size))
+            {
+                traceEvent(TRACE_ERROR, "Invalid ADV community name: %s",
+                           info.comm_ptr[0].name);
+                return;
+            }
+
             /* clear supernodes list */
             clear_sn_list(&eee->supernodes.list_head);
 

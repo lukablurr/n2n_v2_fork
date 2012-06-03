@@ -624,11 +624,12 @@ int build_snm_info( int              sock,         /* for ADV */
 
             if (ci)
             {
-                SET_A(info_hdr->flags);
                 CLR_S(req_hdr->flags);
+                SET_N(info_hdr->flags);
+                SET_A(info_hdr->flags);
 
+                /* set community supernodes ADV addresses */
                 info->sn_num = ci->sn_num + 1;
-
                 if (alloc_supernodes(&info->sn_ptr, info->sn_num))
                 {
                     traceEvent(TRACE_ERROR, "could not allocate supernodes array");
@@ -637,6 +638,15 @@ int build_snm_info( int              sock,         /* for ADV */
 
                 memcpy(info->sn_ptr, ci->sn_sock, ci->sn_num * sizeof(n2n_sock_t));
                 sn_local_addr(sock, &info->sn_ptr[ci->sn_num]);
+
+                /* set community name */
+                info->comm_num = 1;
+                if (alloc_communities(&info->comm_ptr, info->comm_num))
+                {
+                    traceEvent(TRACE_ERROR, "could not allocate community array");
+                    return -1;
+                }
+                info->comm_ptr[0] = req->comm_ptr[0];
             }
             else
             {
