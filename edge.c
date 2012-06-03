@@ -1182,6 +1182,16 @@ static void supernodes_discovery(n2n_edge_t *eee, time_t nowTime)
     }
 }
 
+static void deregister_supernodes( n2n_edge_t *eee )
+{
+    struct sn_info *sni = eee->supernodes.list_head;
+    while (sni)
+    {
+        send_deregister(eee, &sni->sn);
+        sni = sni->next;
+    }
+}
+
 static void edge_send_snm_req(n2n_edge_t *eee, n2n_sock_t *sn)
 {
     uint8_t          pktbuf[N2N_PKT_BUF_SIZE];
@@ -2831,7 +2841,11 @@ static int run_loop(n2n_edge_t * eee )
 
     } /* while */
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+    deregister_supernodes(eee);
+#else
     send_deregister( eee, &(eee->supernode));
+#endif
 
     closesocket(eee->udp_sock);
     tuntap_close(&(eee->device));
