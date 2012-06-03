@@ -145,10 +145,7 @@ int decode_SNM_REQ( n2n_SNM_REQ_t    *pkt,
             retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
         }
     }
-    else
-    {
-        pkt->comm_num = 0;
-    }
+
     return retval;
 }
 
@@ -163,7 +160,7 @@ int encode_SNM_INFO( uint8_t *base,
     retval += encode_uint16(base, idx, info->sn_num);
     retval += encode_uint16(base, idx, info->comm_num);
 
-    if (GET_S(hdr->flags))
+    if (GET_S(hdr->flags) || GET_A(hdr->flags)) /* SNM / ADV adresses */
     {
         for (i = 0; i < info->sn_num; i++)
         {
@@ -194,7 +191,7 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
     retval += decode_uint16(&pkt->sn_num, base, rem, idx);
     retval += decode_uint16(&pkt->comm_num, base, rem, idx);
 
-    if (GET_S(hdr->flags))
+    if (GET_S(hdr->flags) || GET_A(hdr->flags)) /* SNM / ADV adresses */
     {
         if (alloc_supernodes(&pkt->sn_ptr, pkt->sn_num))
         {
