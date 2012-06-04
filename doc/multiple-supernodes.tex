@@ -1,0 +1,92 @@
+% vim: set tw=78 sts=2 sw=2 ts=8 aw et ai:
+\documentclass[12pt]{article}
+
+\usepackage[paper=a4paper, top=2cm, bottom=3cm, left=2.5cm, right=2.5cm]{geometry}
+
+\usepackage{ucs}
+\usepackage[utf8x]{inputenc}
+\usepackage[english]{babel}
+\usepackage{underscore}	  % underscores need not be escaped
+\usepackage{subfigure}
+\usepackage{verbatim}
+\usepackage{float}
+\usepackage{booktabs}     % professional tables
+\usepackage{parskip}      % paragraph spacing
+\usepackage{setspace}     % line spacing
+
+% Support for including graphics
+\usepackage{graphicx}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+
+\usepackage{hyperref}	  % use \url{http://$URL} or \href{http://$URL}{Name}
+\hypersetup{%
+	colorlinks=true,
+	linkcolor=black,
+	anchorcolor=black,
+	citecolor=black,
+	filecolor=black,
+	menucolor=black,
+	urlcolor=black,
+	bookmarks=black,
+	bookmarksnumbered=black
+}
+% commands for creating labeled hyper-linked references
+\newcommand{\labelindexref}[2]{\hyperref[#2]{#1~\ref*{#2}}}
+\newcommand{\labelref}[2]{\hyperref[#2]{#1}}
+
+\title{Peer-To-Peer Virtual Private Networks:\\
+Multiple Supernodes Feature for N2N}
+
+\author{Costin Lupu\\
+Automatic Control and Computers Faculty\\
+University POLITEHNICA of Bucharest\\
+Splaiul Independenței nr. 313, Bucharest, Romania \\
+\emph{costin.lup@gmail.com}}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{src/abstract}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+\input{src/introduction}
+
+\section{Multiple Supernodes - Overview}
+\label{sec:multiple-supernodes}
+\input{src/multiple-supernodes}
+
+\section{Message Formats}
+\label{sec:message-formats}
+\input{src/message-formats}
+
+\section{Supernodes Communication}
+\label{sec:supernodes-communication}
+\input{src/supernodes-communication}
+
+\section{Edge - Supernode Communication}
+\label{sec:edge-supernode-communication}
+\input{src/edge-supernode-communication}
+
+\section{Experimental Setup}
+\label{sec:setup}
+\input{src/setup}
+
+\section{Conclusion and Further Work}
+\label{sec:conclusion}
+\input{src/conclusion}
+
+\section*{Acknowledgment}
+\label{sec:acknowledgment}
+
+The authors would like to thank XYZ for their support and dedication.
+
+\bibliographystyle{abbrv}
+\bibliography{multiple-supernodes}
+
+\end{document}

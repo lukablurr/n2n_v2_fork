@@ -1,0 +1,18 @@
+% vim: set tw=78 sts=2 sw=2 ts=8 aw et ai:
+Each supernode keeps a persistent list of all registered supernodes in a file, each entry having the form \emph{IP Address:Port}. On startup, a supernode will load the SNM addresses from file and will sent SNM requests to all of them. On first supernode startup it is mandatory to set the -i command line parameter value to a running supernode address (e.g. \emph{./supernode -i a.b.c.d:12000}). After all information about the other running supernodes is collected, the starting supernode will decide to send advertise messages to all those supernodes that are coordinating the communities it is interested in.
+
+Coordinated communities are also kept in a file, along with the advertise addresses of the coordinating counter-parties. This information is also loaded on startup. The supernode will  run through the community discovery stage for finding those communities that have not acquired the needed level of redundancy. The requests will have the C flag set, demanding for communities coordinated by the queried supernode. After all the information is gathered, the new supernode will pick the communities which it will be coordinating, depending on the following parameters: 
+\begin{itemize}
+\item \emph{MIN_SN_per_COMM} – the minimum required number of supernodes coordinating a given community, needed for redundancy purpose 
+\item \emph{MAX_SN_per_COMM} – the maximum number of supernodes serving a given community, needed for avoiding a given community being coordinated by all running supernodes 
+\item \emph{MAX_COMM_per_SN} – the soft limit of communities being coordinated by a given supernode
+\end{itemize}
+
+\begin{figure}[hbtp]
+\begin{center}
+\includegraphics[scale=0.35]{img/supernode-bootstrap.pdf}
+\caption{Communities discovery \label{img:supernode-bootstrap}}
+\end{center}
+\end{figure}
+
+After deciding which communities it will voluntarily coordinate as well, advertise messages will be send to the coordinating counter-parties. The receivers will send back advertise messages with their N2N addresses. When receiving register messages from an edge-node, a supernode will fill in the acknowledgement message the advertising addresses of its counter-parties, to which the edge-node will send register messages also. This way, the lists of peers in the same community is also distributed to every coordinating supernode. An example of communities discovery stage is illustrated in \labelindexref{Fig.}{img:supernode-bootstrap}.

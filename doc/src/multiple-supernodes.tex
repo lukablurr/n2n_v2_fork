@@ -1,0 +1,27 @@
+% vim: set tw=78 sts=2 sw=2 ts=8 aw et ai:
+
+The current N2N versions uses a very limited set of supernodes that are provided on edges startups as command line parameters. Furthermore, there is no communication between supernodes for distributing the lists of communities and/or edges. As a result, in order to communicate with each other, 2 edges in the same community must register to the same supernode. This also implies that for the current version of N2N the supernode becomes a single point of failure, making the whole virtualized network vulnerable. If the supernodes that were used on edge registration stop running, the whole network setup is lost.
+
+Due to its performances and size, N2N can be also used on mesh mobile or wireless sensor networks. However, different mesh networks cannot be interconnected as long as their coordinating nodes, the supernodes in the N2N case, don't have a communication protocol. For a set of low power mobile nodes it is essential that the communication with the coordinating node to be established based on connectivity performance.
+
+Another key factor for improving communication, especially when relaying is necessary, is load-balancing: the communities should be equally distributed among the set of supernodes based on their edges number and response times.
+
+The problems outlined above raised the demand on the N2N discussion list \cite{demand} for implementing multiple supernodes functionality for N2N. The N2N creators suggested the following basic functions would be needed in edge \cite{suggestions}:
+\begin{itemize}
+\item Detecting that a supernode has failed
+\item Avoiding use of failed supernodes
+\item Detecting supernode recovery
+\item Reinstating use of a recovered supernode
+\end{itemize}
+Also, regarding feature design, the authors outlined two major concerns: supernode discovery and packet forwarding behaviour. The options suggested for the former were either all edges in a community are statically configured to use the same set of supernodes, or supernodes can be discovered from any one supernode in the group. The options for packet forwarding behaviour were:
+\begin{itemize}
+\item All edges in a community must stay connected to the complete set of supernodes so that any supernode is able to forward packets between any two edges.
+\item Edges can have different supernode connectivity and the supernodes manage forwarding packets to a supernode which has an open connection to the destination edge.
+\end{itemize}
+The current feature implementation includes dynamic supernode discovery. However, for packet forwarding, the chosen solution was keeping all edges in community connected to the subset of coordinating supernodes. The feature design had to be determined from two perspectives: inter-community and intra-community.
+
+Inter-community perspective involved designing the communication between supernodes under a new protocol, on a different port than the one used for the N2N communication protocol. This approach was chosen because the messages of the N2N protocol are edge oriented, each message header containing the community name of the initiating node. The main goal of supernode communication is distributing the peers communities. A starting supernode would have to choose some communities it would voluntarily coordinate, a decision being made depending on the needed level of redundancy for any given community. This stage will be further referred as communities discovery. Every supernode is represented by 2 pairs of addresses: \emph{IP address, UDP Port}. First one, used in the N2N protocol will be further referred as N2N address or advertise address, is the address on which a supernode is receiving edge registrations or performing relayed transfers for peers between symmetric NAT. Second one, used in the Multiple Supernodes protocol will be referred as SNM address.
+
+Intra-community perspective implied choosing the messages to be exchanged between an edge-node and a supernode, before the former is ready to communicate with its peers. The main goal is establishing the set of supernodes that will be coordinating the community based on connection quality and supernodes load level. This stage will be further referred as supernodes discovery.
+
+The feature was implemented \cite{git_repo} in order to alter as less as possible the current version of N2N and to allow further modifications to be made easily. Decisions regarding the design of the two types of communication will be argued next. In following sections of the report, the implemented protocol will be referred as Multiple Supernodes or SNM protocol. 
