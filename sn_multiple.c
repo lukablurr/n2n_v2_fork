@@ -229,7 +229,7 @@ struct sn_info *merge(struct sn_info **left, size_t left_size, struct sn_info **
 
 struct sn_info *merge_sort(struct sn_info **list, size_t size, sn_cmp_func func)
 {
-    if (size == 1)
+    if (size < 2)
     {
         return *list;
     }
