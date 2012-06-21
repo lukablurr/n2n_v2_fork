@@ -1148,7 +1148,7 @@ static void supernodes_discovery(n2n_edge_t *eee, time_t nowTime)
         i   = 0;
         crt = eee->supernodes.list_head;
 
-        while (i < N2N_MIN_SN_PER_COMM && crt != NULL && sn_rank(crt) > 0)
+        while (i < N2N_MIN_SN_PER_COMM && crt != NULL)
         {
             i++;
             prev = crt;
