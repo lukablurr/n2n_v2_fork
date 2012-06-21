@@ -50,7 +50,7 @@ start_edges()
 			local comm_id=$(echo $ci | sed 's/^0//')
 
 			# edge ip: 5.machine_id.comm_id.edge_id
-			./edge -v -v -f -d edge$ci -a 5.$machine_id.$comm_id.$epci -c comm$ci -l $sn_ip > EDGE_LOG_comm$ci &
+			./edge -v -v -f -d edge$ci -p 130$ci -a 22.3.$comm_id.$machine_id -c comm$ci -l $sn_ip > EDGE_LOG_comm$ci &
 
 			(( epci++ ))
 		done
