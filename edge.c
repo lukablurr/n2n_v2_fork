@@ -1395,10 +1395,21 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
         }
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-        if (eee->reg_sn.timestamp < eee->last_register_req)
+        if (eee->reg_sn.timestamp < eee->last_register_req)      /* supernode didn't respond */
+        {
+            if (sn_cmp(&eee->supernode, &eee->reg_sn.sn) == 0)   /* supernode is the main one */
+            {
+                supernode2addr(&(eee->supernode), eee->sn_ip_array[eee->sn_idx]);
+
+                traceEvent(TRACE_WARNING, "Changed active supernode to %s", eee->sn_ip_array[eee->sn_idx]);
+            }
 #endif
         traceEvent(TRACE_WARNING, "Supernode not responding - moving to %u of %u", 
                    (unsigned int)eee->sn_idx, (unsigned int)eee->sn_num );
+
+#ifdef N2N_MULTIPLE_SUPERNODES
+        }
+#endif
 
         eee->sup_attempts = N2N_EDGE_SUP_ATTEMPTS;
     }
@@ -1408,14 +1419,6 @@ static void update_supernode_reg( n2n_edge_t * eee, time_t nowTime )
     }
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-    if (eee->reg_sn.timestamp < eee->last_register_req &&  /* supernode didn't respond */
-        sn_cmp(&eee->supernode, &eee->reg_sn.sn) == 0)     /* supernode is the main one */
-    {
-        supernode2addr(&(eee->supernode), eee->sn_ip_array[eee->sn_idx]);
-
-        traceEvent(TRACE_WARNING, "Changed active supernode to %s", eee->sn_ip_array[eee->sn_idx]);
-    }
-
     /* setting next supernode to register to */
     supernode2addr(&(eee->reg_sn.sn), eee->sn_ip_array[eee->sn_idx]);
     eee->reg_sn.timestamp = 0;
