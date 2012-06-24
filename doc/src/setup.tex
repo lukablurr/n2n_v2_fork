@@ -1,3 +1,36 @@
 % vim: set tw=78 sts=2 sw=2 ts=8 aw et ai:
 
-In order to define recursion, one must first define recursion.
+Edge nodes use TAP \cite{tuntap} devices that act as virtual ethernet devices implemented in the operating system kernel. In TAP devices, the ethernet driver is implemented in a user-space application. In order to communicate with another peer, an edge node must open the TAP device as regular file and read/write messages from/to it. 
+
+The Multiple Supernodes schema was tested on machines running 64-bit Debian Wheezy distribution. 5 supernodes were launched on different machines coordinating a total of 40 communities. For a given community, each edge was started on a different machine.
+The values chosen for SNM parameters where:
+
+\begin{itemize}
+\item MIN_SN_per_COMM = 3
+\item MAX_SN_per_COMM = 4
+\item MAX_COMM_per_SN = 3
+\end{itemize}
+
+An edge node will be saving the N2N addresses of its coordinating supernodes in a file named \emph{EDGE_SN_$<$Community_name$>$}. A supernode will save the SNM addresses of other supernode in a file named \emph{SN_SNM_$<$SNM_port$>$}, while the coordinated communities will be saved in \emph{SN_COMM_$<$SNM_port$>$}. For testing, the chosen UDP ports where: \emph{11XYZ} for N2N communication and \emph{12XYZ} for SNM communication.
+
+\begin{file-content}[caption={Communities file \emph{SN_COMM_12003} for supernode listening on \emph{192.168.0.3:11003}}]
+comm_num=33
+sn_num=3 name=comm02
+	192.168.1.203:11203
+	192.168.1.208:11208
+	192.168.1.210:11210
+sn_num=3 name=comm04
+	192.168.1.203:11203
+	192.168.1.208:11208
+	192.168.1.210:11210
+sn_num=2 name=comm101
+	192.168.1.210:11210
+	192.168.1.208:11208
+sn_num=2 name=comm410
+	192.168.1.203:11203
+	192.168.1.208:11208
+...
+\end{file-content}
+
+The communities file example above illustrates how the supernodes were chosen for communities. The number of supernodes coordinating a community is \emph{$<$sn_num$>$ + 1}, taking into account the host (e.g \emph{192.168.1.202}).
+Communities \emph{comm02} and \emph{comm04} were first created and supernodes \emph{192.168.1.[202,203,208]} were chosen to coordinate them. Next, supernode \emph{192.168.1.203} was stopped, so another supernode, \emph{192.168.1.210}, was requested in order to assure the redundancy. Community \emph{com101} was created while \emph{192.168.1.203} was still down and supernodes \emph{192.168.1.[202,208,210]} were chosen. After supernode running on \emph{192.168.1.203} was started again, community \emph{comm410} was created and supernodes \emph{192.168.1.[202,203,208]} were chosen.

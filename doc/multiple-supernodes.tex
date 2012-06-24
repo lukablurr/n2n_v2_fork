@@ -18,6 +18,18 @@
 \usepackage{graphicx}
 \DeclareGraphicsExtensions{.pdf,.png,.jpg}
 
+% Code listings support
+\usepackage{listings}
+\lstnewenvironment{file-content}[1][]%
+  {\minipage{\linewidth} 
+   \lstset{
+	numbers=left, numberstyle=\footnotesize,
+	frame=lines, captionpos=b,
+	breaklines=true,
+	basicstyle=\ttfamily,#1
+   	}}
+  {\endminipage}
+
 \usepackage{hyperref}	  % use \url{http://$URL} or \href{http://$URL}{Name}
 \hypersetup{%
 	colorlinks=true,
