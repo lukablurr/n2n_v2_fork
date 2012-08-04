@@ -547,6 +547,10 @@ static void help() {
   printf("-v                       | Make more verbose. Repeat as required.\n");
   printf("-t                       | Management UDP Port (for multiple edges on a machine).\n");
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+  printf("-x <SNM port>            | SNM port.\n");
+#endif
+
   printf("\nEnvironment variables:\n");
   printf("  N2N_KEY                | Encryption key (ASCII). Not with -K or -k.\n" );
 

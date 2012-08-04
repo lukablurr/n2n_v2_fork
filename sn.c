@@ -986,6 +986,11 @@ static void exit_help(int argc, char * const argv[])
     fprintf( stderr, "%s usage\n", argv[0] );
     fprintf( stderr, "-l <lport>\tSet UDP main listen port to <lport>\n" );
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+    fprintf( stderr, "-s <snm_port>\tSet SNM listen port to <snm_port>\n" );
+    fprintf( stderr, "-i <ip:port>\tSet running SNM supernode to <ip:port>\n" );
+#endif
+
 #if defined(N2N_HAVE_DAEMON)
     fprintf( stderr, "-f        \tRun in foreground.\n" );
 #endif /* #if defined(N2N_HAVE_DAEMON) */
