@@ -71,7 +71,6 @@ int tuntap_open(tuntap_dev *device,
   struct ifreq ifr;
   int rc;
 
-#ifndef SNM_EDGE_TEST
   device->fd = open(tuntap_device, O_RDWR);
   if(device->fd < 0) {
     printf("ERROR: ioctl() [%s][%d]\n", strerror(errno), errno);
@@ -88,7 +87,6 @@ int tuntap_open(tuntap_dev *device,
     close(device->fd);
     return -1;
   }
-#endif
 
   /* Store the device name for later reuse */
   strncpy(device->dev_name, ifr.ifr_name, MIN(IFNAMSIZ, N2N_IFNAMSIZ) );
@@ -123,25 +121,15 @@ int tuntap_open(tuntap_dev *device,
 }
 
 int tuntap_read(struct tuntap_dev *tuntap, unsigned char *buf, int len) {
-#ifndef SNM_EDGE_TEST
   return(read(tuntap->fd, buf, len));
-#else
-  return 0;
-#endif
 }
 
 int tuntap_write(struct tuntap_dev *tuntap, unsigned char *buf, int len) {
-#ifndef SNM_EDGE_TEST
   return(write(tuntap->fd, buf, len));
-#else
-  return 0;
-#endif
 }
 
 void tuntap_close(struct tuntap_dev *tuntap) {
-#ifndef SNM_EDGE_TEST
   close(tuntap->fd);
-#endif
 }
 
 /* Fill out the ip_addr value from the interface. Called to pick up dynamic
