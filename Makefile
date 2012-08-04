@@ -25,9 +25,8 @@ ifeq ($(N2N_OPTION_AES), "yes")
     LIBS_EDGE_OPT+=-lcrypto
 endif
 
-N2N_DEFINES+="-DN2N_MULTIPLE_SUPERNODES"
-ifeq ($(SNM_EDGE_TEST), yes)
-    N2N_DEFINES+="-DSNM_EDGE_TEST"
+ifeq ($(SNM), yes)
+    N2N_DEFINES+="-DN2N_MULTIPLE_SUPERNODES"
 endif
 
 CFLAGS+=$(DEBUG) $(OPTIMIZATION) $(WARN) $(OPTIONS) $(PLATOPTS) $(N2N_DEFINES)
@@ -51,8 +50,12 @@ MAN8DIR=$(MANDIR)/man8
 N2N_LIB=n2n.a
 N2N_OBJS=n2n.o n2n_keyfile.o wire.o minilzo.o twofish.o \
          transform_null.o transform_tf.o transform_aes.o \
-         tuntap_freebsd.o tuntap_netbsd.o tuntap_linux.o tuntap_osx.o version.o \
-         sn_multiple.o sn_multiple_wire.o 
+         tuntap_freebsd.o tuntap_netbsd.o tuntap_linux.o tuntap_osx.o version.o
+
+ifeq ($(SNM), yes)
+N2N_OBJS+=sn_multiple.o sn_multiple_wire.o 
+endif
+
 LIBS_EDGE+=$(LIBS_EDGE_OPT)
 LIBS_SN=
 
@@ -80,9 +83,11 @@ supernode: sn.c $(N2N_LIB) n2n.h Makefile
 
 benchmark: benchmark.c $(N2N_LIB) n2n_wire.h n2n.h Makefile
 	$(CC) $(CFLAGS) benchmark.c $(N2N_LIB) $(LIBS_SN) -o benchmark
-	
+
+ifeq ($(SNM), yes)
 test_snm: sn_multiple_test.c $(N2N_LIB) n2n.h Makefile
 	$(CC) $(CFLAGS) sn_multiple_test.c $(N2N_LIB) $(LIBS_SN) -o test_snm
+endif
 
 .c.o: n2n.h n2n_keyfile.h n2n_transforms.h n2n_wire.h twofish.h Makefile
 	$(CC) $(CFLAGS) -c $<
