@@ -14,10 +14,6 @@
 #define SNM_TYPE_REQ_LIST_MSG             0x01
 #define SNM_TYPE_RSP_LIST_MSG             0x02
 #define SNM_TYPE_ADV_MSG                  0x03
-/*
-#define SNM_TYPE_REQ_SUPER_LIST_MSG       0x04
-#define SNM_TYPE_RSP_SUPER_LIST_MSG       0x04
-*/
 
 typedef struct snm_hdr
 {
@@ -67,20 +63,17 @@ typedef struct snm_hdr
 typedef struct snm_comm_name
 {
     uint8_t           size;
-    /*uint8_t          *name;*/
     n2n_community_t   name;
 } snm_comm_name_t;
 
 typedef struct n2n_SNM_REQ_INFO
 {
-    /*snm_hdr_t         hdr;*/
     uint16_t          comm_num;
     snm_comm_name_t  *comm_ptr;
 } n2n_SNM_REQ_t;
 
 typedef struct n2n_SNM_INFO
 {
-    /*snm_hdr_t         hdr;*/
     uint16_t          sn_num;
     uint16_t          comm_num;
     n2n_sock_t       *sn_ptr;
