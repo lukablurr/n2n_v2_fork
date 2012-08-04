@@ -37,7 +37,7 @@
 #define REGISTER_SUPER_INTERVAL_DFL     20 /* sec */
 #else  /* #if defined(DEBUG) */
 #define SOCKET_TIMEOUT_INTERVAL_SECS    10
-#define REGISTER_SUPER_INTERVAL_DFL     6 /* sec */
+#define REGISTER_SUPER_INTERVAL_DFL     60 /* sec */
 #endif /* #if defined(DEBUG) */
 
 #define REGISTER_SUPER_INTERVAL_MIN     20   /* sec */
@@ -1955,6 +1955,7 @@ static void readFromMgmtSocket( n2n_edge_t * eee, int * keep_running )
 
 }
 
+
 /** Read a datagram from the main UDP socket to the internet. */
 static void readFromIPSocket( n2n_edge_t * eee )
 {
@@ -2604,7 +2605,8 @@ int main(int argc, char* argv[])
 
 
     traceEvent( TRACE_NORMAL, "Starting n2n edge %s %s", n2n_sw_version, n2n_sw_buildDate );
-    
+
+
     for (i=0; i< N2N_EDGE_NUM_SUPERNODES; ++i )
     {
         traceEvent( TRACE_NORMAL, "supernode %u => %s\n", i, (eee.sn_ip_array[i]) );

@@ -40,6 +40,7 @@
 #define _DARWIN_
 #endif
 
+
 /* Some capability defaults which can be reset for particular platforms. */
 #define N2N_HAVE_DAEMON 1
 #define N2N_HAVE_SETUID 1
