@@ -109,7 +109,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="false"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;N2N_MULTIPLE_SUPERNODES"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="false"
 				WarningLevel="3"
