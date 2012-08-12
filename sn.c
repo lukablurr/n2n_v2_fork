@@ -406,7 +406,7 @@ static int process_mgmt( n2n_sn_t * sss,
 static int load_snm_info(n2n_sn_t *sss)
 {
     int new_ones = 0;
-	struct sn_info *p = NULL;
+    struct sn_info *p = NULL;
 
     /* load supernodes */
     struct sn_info *cmd_line_list  = sss->supernodes.list_head;
@@ -468,7 +468,7 @@ static void advertise_all(n2n_sn_t *sss)
 
 static void advertise_community_to_all(n2n_sn_t *sss, const n2n_community_t community)
 {
-	struct sn_info *p = NULL;
+    struct sn_info *p = NULL;
     struct comm_info ci;
 
     memset(&ci, 0, sizeof(struct comm_info));
@@ -497,7 +497,7 @@ static void communities_discovery(n2n_sn_t *sss, time_t nowTime)
 
         /* add new communities */
         struct comm_info *p = tmp_list;
-		
+
         sss->communities.list_head = sss->communities.persist;
 
         while (comm_num < N2N_MAX_COMM_PER_SN && p != NULL)
@@ -648,7 +648,7 @@ static int process_sn_msg( n2n_sn_t *sss,
 
     if (msg_type == SNM_TYPE_REQ_LIST_MSG)
     {
-		n2n_SNM_REQ_t req;
+        n2n_SNM_REQ_t req;
 
         if (sss->snm_discovery_state != N2N_SNM_STATE_READY)
         {
@@ -666,8 +666,8 @@ static int process_sn_msg( n2n_sn_t *sss,
             if (GET_E(hdr.flags))
             {
                 /* request from edge wanting to register a new community */
-				struct comm_info *ci = NULL;
-				int need_write = 0;
+                struct comm_info *ci = NULL;
+                int need_write = 0;
 
                 if (req.comm_num != 1)
                 {
@@ -700,9 +700,9 @@ static int process_sn_msg( n2n_sn_t *sss,
     }
     else if (msg_type == SNM_TYPE_RSP_LIST_MSG)
     {
-		n2n_SNM_INFO_t rsp;
-		int sn_num = 0;
-		struct sn_info *new_sn = NULL;
+        n2n_SNM_INFO_t rsp;
+        int sn_num = 0;
+        struct sn_info *new_sn = NULL;
 
         if (sss->snm_discovery_state == N2N_SNM_STATE_READY)
         {
@@ -728,7 +728,7 @@ static int process_sn_msg( n2n_sn_t *sss,
     else if (msg_type == SNM_TYPE_ADV_MSG)
     {
         n2n_SNM_ADV_t adv;
-		int communities_updated = 0;
+        int communities_updated = 0;
 
         decode_SNM_ADV(&adv, &hdr, msg_buf, &rem, &idx);
         log_SNM_ADV(&adv);
@@ -964,7 +964,7 @@ static int process_udp( n2n_sn_t * sss,
         update_edge( sss, reg.edgeMac, cmn.community, &(ack.sock), now );
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-		{
+        {
             struct comm_info *ci = comm_find(sss->communities.list_head,
                                              cmn.community, strlen((const char *) cmn.community));
             if (ci)
@@ -972,7 +972,7 @@ static int process_udp( n2n_sn_t * sss,
                 ack.num_sn = ci->sn_num;
                 memcpy(&ack.sn_bak, ci->sn_sock, ci->sn_num * sizeof(n2n_sock_t));
             }
-		}
+        }
 #endif
 
         encode_REGISTER_SUPER_ACK( ackbuf, &encx, &cmn2, &ack );

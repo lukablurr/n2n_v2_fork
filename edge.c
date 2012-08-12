@@ -1079,7 +1079,7 @@ static int load_supernodes(n2n_edge_t *eee)
         struct sn_info *sni = eee->supernodes.list_head;
         eee->sn_num = 0;
 
-		while (sni)
+        while (sni)
         {
             sock_to_cstr(eee->sn_ip_array[eee->sn_num++], &sni->sn);
             sni = sni->next;
@@ -1097,7 +1097,7 @@ static int load_supernodes(n2n_edge_t *eee)
 
 static int add_supernode(n2n_edge_t *eee, n2n_sock_t *sn)
 {
-	int new_one = 0;
+    int new_one = 0;
 
     if (eee->sn_num == N2N_EDGE_NUM_SUPERNODES)
     {
@@ -1278,7 +1278,7 @@ static void readFromSNMSocket(n2n_edge_t *eee)
 
     if (msg_type == SNM_TYPE_RSP_LIST_MSG)
     {
-		n2n_SNM_INFO_t info;
+        n2n_SNM_INFO_t info;
 
         if (eee->snm_discovery_state == N2N_SNM_STATE_READY)
         {
