@@ -1045,7 +1045,7 @@ static void send_grat_arps(n2n_edge_t * eee,) {
 
 static int load_supernodes(n2n_edge_t *eee)
 {
-    int i;
+    size_t i;
     n2n_sock_t sn;
 
     /* read the supernode addresses from file */
@@ -1075,11 +1075,11 @@ static int load_supernodes(n2n_edge_t *eee)
     }
     else
     {
-        eee->sn_num = 0;
-
         /* fill sn_ip_array */
         struct sn_info *sni = eee->supernodes.list_head;
-        while (sni)
+        eee->sn_num = 0;
+
+		while (sni)
         {
             sock_to_cstr(eee->sn_ip_array[eee->sn_num++], &sni->sn);
             sni = sni->next;
@@ -1097,13 +1097,15 @@ static int load_supernodes(n2n_edge_t *eee)
 
 static int add_supernode(n2n_edge_t *eee, n2n_sock_t *sn)
 {
+	int new_one = 0;
+
     if (eee->sn_num == N2N_EDGE_NUM_SUPERNODES)
     {
         traceEvent(TRACE_ERROR, "Already have MAX supernodes addresses");
         return -1;
     }
 
-    int new_one = update_and_save_supernodes(&eee->supernodes, sn, 1);
+    new_one = update_and_save_supernodes(&eee->supernodes, sn, 1);
 
     if (new_one)
     {
@@ -1126,7 +1128,7 @@ static int sn_rank(struct sn_info *sni)
 {
     int delta = N2N_MAX_COMM_PER_SN - sni->communities_num;
     delta = MAX(delta, 1);
-    return (sni->timestamp * 100 / delta);
+    return (int) (sni->timestamp * 100 / delta);
 }
 
 static int sn_cmp_rank_asc(struct sn_info *l, struct sn_info *r)
@@ -1276,13 +1278,14 @@ static void readFromSNMSocket(n2n_edge_t *eee)
 
     if (msg_type == SNM_TYPE_RSP_LIST_MSG)
     {
+		n2n_SNM_INFO_t info;
+
         if (eee->snm_discovery_state == N2N_SNM_STATE_READY)
         {
             traceEvent(TRACE_ERROR, "Received SNM RSP but edge is READY");
             return;
         }
-
-        n2n_SNM_INFO_t info;
+        
         decode_SNM_INFO(&info, &hdr, udp_buf, &rem, &idx);
         log_SNM_INFO(&info);
 
@@ -2347,6 +2350,12 @@ int main(int argc, char* argv[])
     char    device_mac[N2N_MACNAMSIZ]="";
     char *  encrypt_key=NULL;
 
+#ifdef N2N_MULTIPLE_SUPERNODES
+    const char *optstring = "K:k:a:bc:Eu:g:m:M:s:d:l:p:fvhrt:x:";
+#else
+    const char *optstring = "K:k:a:bc:Eu:g:m:M:s:d:l:p:fvhrt:";
+#endif
+
     int     i, effectiveargc=0;
     char ** effectiveargv=NULL;
     char  * linebuffer = NULL;
@@ -2418,12 +2427,6 @@ int main(int argc, char* argv[])
     }
 
     /* {int k;for(k=0;k<effectiveargc;++k)  printf("%s\n",effectiveargv[k]);} */
-
-#ifdef N2N_MULTIPLE_SUPERNODES
-        const char *optstring = "K:k:a:bc:Eu:g:m:M:s:d:l:p:fvhrt:x:";
-#else
-        const char *optstring = "K:k:a:bc:Eu:g:m:M:s:d:l:p:fvhrt:";
-#endif
 
     optarg = NULL;
     while((opt = getopt_long(effectiveargc,

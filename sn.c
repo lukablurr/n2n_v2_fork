@@ -405,6 +405,9 @@ static int process_mgmt( n2n_sn_t * sss,
 
 static int load_snm_info(n2n_sn_t *sss)
 {
+    int new_ones = 0;
+	struct sn_info *p = NULL;
+
     /* load supernodes */
     struct sn_info *cmd_line_list  = sss->supernodes.list_head;
     sss->supernodes.list_head = NULL;
@@ -418,9 +421,8 @@ static int load_snm_info(n2n_sn_t *sss)
     }
 
     /* check if we had some new supernodes before reading from file */
-    int new_ones = 0;
 
-    struct sn_info *p = cmd_line_list;
+    p = cmd_line_list;
     while (p)
     {
         new_ones += update_supernodes(&sss->supernodes, &p->sn);
@@ -466,12 +468,13 @@ static void advertise_all(n2n_sn_t *sss)
 
 static void advertise_community_to_all(n2n_sn_t *sss, const n2n_community_t community)
 {
+	struct sn_info *p = NULL;
     struct comm_info ci;
 
     memset(&ci, 0, sizeof(struct comm_info));
     memcpy(ci.community_name, community, sizeof(n2n_community_t));
 
-    struct sn_info *p = sss->supernodes.list_head;
+    p = sss->supernodes.list_head;
 
     while (p)
     {
@@ -490,12 +493,12 @@ static void communities_discovery(n2n_sn_t *sss, time_t nowTime)
     if (sss->snm_discovery_state == N2N_SNM_STATE_DISCOVERY)
     {
         struct comm_info *tmp_list = sss->communities.list_head;   /* queried communities */
-        sss->communities.list_head = sss->communities.persist;
-
         int comm_num = comm_list_size(sss->communities.persist);
 
         /* add new communities */
         struct comm_info *p = tmp_list;
+		
+        sss->communities.list_head = sss->communities.persist;
 
         while (comm_num < N2N_MAX_COMM_PER_SN && p != NULL)
         {
@@ -645,13 +648,14 @@ static int process_sn_msg( n2n_sn_t *sss,
 
     if (msg_type == SNM_TYPE_REQ_LIST_MSG)
     {
+		n2n_SNM_REQ_t req;
+
         if (sss->snm_discovery_state != N2N_SNM_STATE_READY)
         {
             traceEvent(TRACE_ERROR, "Received SNM REQ but supernode is NOT READY");
             return -1;
         }
-
-        n2n_SNM_REQ_t req;
+        
         decode_SNM_REQ(&req, &hdr, msg_buf, &rem, &idx);
         log_SNM_REQ(&req);
 
@@ -662,6 +666,8 @@ static int process_sn_msg( n2n_sn_t *sss,
             if (GET_E(hdr.flags))
             {
                 /* request from edge wanting to register a new community */
+				struct comm_info *ci = NULL;
+				int need_write = 0;
 
                 if (req.comm_num != 1)
                 {
@@ -669,9 +675,7 @@ static int process_sn_msg( n2n_sn_t *sss,
                     return -1;
                 }
 
-                struct comm_info *ci;
-
-                int need_write = add_new_community(&sss->communities, req.comm_ptr[0].name, &ci);
+                need_write = add_new_community(&sss->communities, req.comm_ptr[0].name, &ci);
                 if (need_write)
                 {
                     write_comm_list_to_file(sss->communities.filename,
@@ -696,21 +700,24 @@ static int process_sn_msg( n2n_sn_t *sss,
     }
     else if (msg_type == SNM_TYPE_RSP_LIST_MSG)
     {
+		n2n_SNM_INFO_t rsp;
+		int sn_num = 0;
+		struct sn_info *new_sn = NULL;
+
         if (sss->snm_discovery_state == N2N_SNM_STATE_READY)
         {
             traceEvent(TRACE_ERROR, "Received SNM RSP but supernode is READY");
             return -1;
         }
-
-        n2n_SNM_INFO_t rsp;
+        
         decode_SNM_INFO(&rsp, &hdr, msg_buf, &rem, &idx);
         log_SNM_INFO(&rsp);
 
-        int sn_num = process_snm_rsp(&sss->supernodes, &sss->communities,
-                                     &sender_sn, &hdr, &rsp);
+        sn_num = process_snm_rsp(&sss->supernodes, &sss->communities,
+                                 &sender_sn, &hdr, &rsp);
 
         /* send requests to the recently added supernodes */
-        struct sn_info *new_sn = sss->supernodes.list_head;
+        new_sn = sss->supernodes.list_head;
         while (sn_num > 0 && new_sn)
         {
             send_snm_req(sss, &new_sn->sn, 1, NULL, 0);
@@ -721,12 +728,14 @@ static int process_sn_msg( n2n_sn_t *sss,
     else if (msg_type == SNM_TYPE_ADV_MSG)
     {
         n2n_SNM_ADV_t adv;
+		int communities_updated = 0;
+
         decode_SNM_ADV(&adv, &hdr, msg_buf, &rem, &idx);
         log_SNM_ADV(&adv);
 
-        int communities_updated = process_snm_adv(&sss->supernodes,
-                                                  &sss->communities,
-                                                  &sender_sn, &adv);
+        communities_updated = process_snm_adv(&sss->supernodes,
+                                              &sss->communities,
+                                              &sender_sn, &adv);
 
         if (communities_updated && GET_A(hdr.flags))
         {
@@ -955,13 +964,15 @@ static int process_udp( n2n_sn_t * sss,
         update_edge( sss, reg.edgeMac, cmn.community, &(ack.sock), now );
 
 #ifdef N2N_MULTIPLE_SUPERNODES
-        struct comm_info *ci = comm_find(sss->communities.list_head,
-                                         cmn.community, strlen((const char *) cmn.community));
-        if (ci)
-        {
-            ack.num_sn = ci->sn_num;
-            memcpy(&ack.sn_bak, ci->sn_sock, ci->sn_num * sizeof(n2n_sock_t));
-        }
+		{
+            struct comm_info *ci = comm_find(sss->communities.list_head,
+                                             cmn.community, strlen((const char *) cmn.community));
+            if (ci)
+            {
+                ack.num_sn = ci->sn_num;
+                memcpy(&ack.sn_bak, ci->sn_sock, ci->sn_num * sizeof(n2n_sock_t));
+            }
+		}
 #endif
 
         encode_REGISTER_SUPER_ACK( ackbuf, &encx, &cmn2, &ack );
@@ -1117,9 +1128,7 @@ int main( int argc, char * const argv[] )
 
     traceEvent(TRACE_NORMAL, "supernode is listening on UDP %u (supernodes communication)", sss.sn_port);
 
-    int request_communities = (sss.snm_discovery_state != N2N_SNM_STATE_READY);
-
-    send_req_to_all_supernodes(&sss, request_communities, NULL, 0);
+    send_req_to_all_supernodes(&sss, (sss.snm_discovery_state != N2N_SNM_STATE_READY), NULL, 0);
 
 #endif /* #ifdef N2N_MULTIPLE_SUPERNODES */
 

@@ -8,7 +8,17 @@
 #ifndef SN_MULTIPLE_WIRE_H_
 #define SN_MULTIPLE_WIRE_H_
 
-#include <stdint.h>//TODO win
+#if defined(WIN32)
+#include "win32/n2n_win32.h"
+
+#if defined(__MINGW32__)
+#include <stdint.h>
+#endif /* #ifdef __MINGW32__ */
+
+#else /* #if defined(WIN32) */
+#include <stdint.h>
+#endif /* #if defined(WIN32) */
+
 #include "n2n_wire.h"
 
 #define SNM_TYPE_REQ_LIST_MSG             0x01

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="windows-1250"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9,00"
+	Version="9.00"
 	Name="supernode"
 	ProjectGUID="{BDB93CAB-BE22-4ED6-9A05-2E4D6F1D76E1}"
 	RootNamespace="supernode"
@@ -180,6 +180,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\sn_multiple.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\sn_multiple_wire.c"
+				>
+			</File>
+			<File
 				RelativePath="..\version-msvc.c"
 				>
 			</File>
@@ -211,6 +219,14 @@
 			</File>
 			<File
 				RelativePath="..\..\n2n_wire.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\sn_multiple.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\sn_multiple_wire.h"
 				>
 			</File>
 		</Filter>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9,00"
+	Version="9.00"
 	Name="edge"
 	ProjectGUID="{4911ADD4-08A3-4C9F-B9C9-9492DA10D01D}"
 	RootNamespace="n2n"
@@ -202,6 +202,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\sn_multiple.c"
+				>
+			</File>
+			<File
+				RelativePath="..\..\sn_multiple_wire.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\transform_aes.c"
 				>
 			</File>
@@ -269,6 +277,14 @@
 			</File>
 			<File
 				RelativePath="..\..\n2n_wire.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\sn_multiple.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\sn_multiple_wire.h"
 				>
 			</File>
 			<File

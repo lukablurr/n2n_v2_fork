@@ -105,13 +105,12 @@ int encode_SNM_REQ( uint8_t *base,
                     const snm_hdr_t     *hdr,
                     const n2n_SNM_REQ_t *req )
 {
-    int retval = 0;
+    int i, retval = 0;
     retval += encode_SNM_hdr(base, idx, hdr);
     if (GET_N(hdr->flags))
     {
         retval += encode_uint16(base, idx, req->comm_num);
 
-        int i;
         for (i = 0; i < req->comm_num; i++)
         {
             retval += encode_SNM_comm(base, idx, &req->comm_ptr[i]);
@@ -126,7 +125,7 @@ int decode_SNM_REQ( n2n_SNM_REQ_t    *pkt,
                     size_t *rem,
                     size_t *idx )
 {
-    int retval = 0;
+    int i, retval = 0;
 
     memset(pkt, 0, sizeof(n2n_SNM_REQ_t));
 
@@ -139,7 +138,6 @@ int decode_SNM_REQ( n2n_SNM_REQ_t    *pkt,
             return -1;
         }
 
-        int i;
         for (i = 0; i < pkt->comm_num; i++)
         {
             retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
@@ -154,8 +152,7 @@ int encode_SNM_INFO( uint8_t *base,
                      const snm_hdr_t      *hdr,
                      const n2n_SNM_INFO_t *info )
 {
-    int i;
-    int retval = 0;
+    int i, retval = 0;
     retval += encode_SNM_hdr(base, idx, hdr);
     retval += encode_uint16(base, idx, info->sn_num);
     retval += encode_uint16(base, idx, info->comm_num);
@@ -183,8 +180,7 @@ int decode_SNM_INFO( n2n_SNM_INFO_t   *pkt,
                      size_t * rem,
                      size_t * idx )
 {
-    int i;
-    int retval = 0;
+    int i, retval = 0;
 
     memset(pkt, 0, sizeof(n2n_SNM_INFO_t));
 
@@ -224,14 +220,13 @@ int encode_SNM_ADV( uint8_t *base,
                     const snm_hdr_t     *hdr,
                     const n2n_SNM_ADV_t *adv )
 {
-    int retval = 0;
+    int i, retval = 0;
     retval += encode_SNM_hdr(base, idx, hdr);
     retval += encode_sock(base, idx, &adv->sn);
     if (GET_N(hdr->flags))
     {
         retval += encode_uint16(base, idx, adv->comm_num);
 
-        int i;
         for (i = 0; i < adv->comm_num; i++)
         {
             retval += encode_SNM_comm(base, idx, &adv->comm_ptr[i]);
@@ -246,7 +241,7 @@ int decode_SNM_ADV( n2n_SNM_ADV_t     *pkt,
                     size_t *rem,
                     size_t *idx )
 {
-    int retval = 0;
+    int i, retval = 0;
 
     memset(pkt, 0, sizeof(n2n_SNM_ADV_t));
 
@@ -260,7 +255,6 @@ int decode_SNM_ADV( n2n_SNM_ADV_t     *pkt,
             return -1;
         }
 
-        int i;
         for (i = 0; i < pkt->comm_num; i++)
         {
             retval += decode_SNM_comm(&pkt->comm_ptr[i], base, rem, idx);
