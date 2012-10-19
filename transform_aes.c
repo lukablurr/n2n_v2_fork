@@ -6,10 +6,13 @@
 #include "n2n.h"
 #include "n2n_transforms.h"
 
-#if defined(N2N_HAVE_AES)
+//#if defined(N2N_HAVE_AES) /* Wasn't getting this? */
+#if defined(DN2N_HAVE_AES)
+
+//#include "openssl/aes.h"
+#include "polarssl/aes.h"
 
 
-#include "openssl/aes.h"
 #ifndef _MSC_VER
 /* Not included in Visual Studio 2008 */
 #include <strings.h> /* index() */
@@ -20,15 +23,17 @@
 #define N2N_AES_TRANSFORM_VERSION       1  /* version of the transform encoding */
 #define N2N_AES_IVEC_SIZE               32 /* Enough space for biggest AES ivec */
 
+#define AES_BLOCK_SIZE 			16 /* Was provided by OpenSSL, now we need it ourselves*/
+
 typedef unsigned char n2n_aes_ivec_t[N2N_AES_IVEC_SIZE];
 
 struct sa_aes
 {
     n2n_cipherspec_t    spec;           /* cipher spec parameters */
     n2n_sa_t            sa_id;          /* security association index */
-    AES_KEY             enc_key;        /* tx key */
+    aes_context             enc_key;        /* tx key */
     n2n_aes_ivec_t      enc_ivec;       /* tx CBC state */
-    AES_KEY             dec_key;        /* tx key */
+    aes_context             dec_key;        /* tx key */
     n2n_aes_ivec_t      dec_ivec;       /* tx CBC state */
 };
 
@@ -170,10 +175,19 @@ static int transop_encode_aes( n2n_trans_op_t * arg,
             traceEvent( TRACE_DEBUG, "padding = %u", assembly[ len2-1 ] );
 
             memset( &(sa->enc_ivec), 0, sizeof(N2N_AES_IVEC_SIZE) );
-            AES_cbc_encrypt( assembly, /* source */
-                             outbuf + TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE, /* dest */
-                             len2, /* enc size */
-                             &(sa->enc_key), sa->enc_ivec, 1 /* encrypt */ );
+
+//	original OpenSSL
+//            AES_cbc_encrypt( assembly, /* source */
+//                             outbuf + TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE, /* dest */
+//                             len2, /* enc size */
+//                             &(sa->enc_key), sa->enc_ivec, 1 /* encrypt */ );
+//	new PolarSSL
+            aes_crypt_cbc( &(sa->enc_key),
+			   1,
+			   len2,
+			   sa->enc_ivec,
+			   assembly,
+			   outbuf + TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE );
 
             len2 += TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE; /* size of data carried in UDP. */
         }
@@ -265,11 +279,19 @@ static int transop_decode_aes( n2n_trans_op_t * arg,
                     uint8_t padding;
 
                     memset( &(sa->dec_ivec), 0, sizeof(N2N_AES_IVEC_SIZE) );
-                    AES_cbc_encrypt( (inbuf + TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE),
-                                     assembly, /* destination */
-                                     len, 
-                                     &(sa->dec_key),
-                                     sa->dec_ivec, 0 /* decrypt */ );
+//                    AES_cbc_encrypt( (inbuf + TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE),
+//                                     assembly, /* destination */
+//                                     len, 
+//                                     &(sa->dec_key),
+//                                     sa->dec_ivec, 0 /* decrypt */ );
+
+                  aes_crypt_cbc( &(sa->dec_key),
+				 1,
+				 len,
+				 sa->dec_ivec,
+				 inbuf + TRANSOP_AES_VER_SIZE + TRANSOP_AES_SA_SIZE,
+				 assembly
+				);
 
                     /* last byte is how much was padding: max value should be
                      * AES_BLOCKSIZE-1 */
@@ -362,8 +384,8 @@ static int transop_addspec_aes( n2n_trans_op_t * arg, const n2n_cipherspec_t * c
                 size_t aes_keysize_bits;
 
                 /* Clear out any old possibly longer key matter. */
-                memset( &(sa->enc_key), 0, sizeof(AES_KEY) );
-                memset( &(sa->dec_key), 0, sizeof(AES_KEY) );
+                memset( &(sa->enc_key), 0, sizeof(aes_context) );
+                memset( &(sa->dec_key), 0, sizeof(aes_context) );
 
                 memset( &(sa->enc_ivec), 0, sizeof(N2N_AES_IVEC_SIZE) );
                 memset( &(sa->dec_ivec), 0, sizeof(N2N_AES_IVEC_SIZE) );
@@ -375,8 +397,10 @@ static int transop_addspec_aes( n2n_trans_op_t * arg, const n2n_cipherspec_t * c
                  * size. If fewer bits specified then the rest will be
                  * zeroes. AES acceptable key sizes are 128, 192 and 256
                  * bits. */
-                AES_set_encrypt_key( keybuf, aes_keysize_bits, &(sa->enc_key));
-                AES_set_decrypt_key( keybuf, aes_keysize_bits, &(sa->dec_key));
+                //AES_set_encrypt_key( keybuf, aes_keysize_bits, &(sa->enc_key));
+		aes_setkey_enc(&(sa->enc_key), keybuf, aes_keysize_bits);
+                //AES_set_decrypt_key( keybuf, aes_keysize_bits, &(sa->dec_key));
+		aes_setkey_dec(&(sa->enc_key), keybuf, aes_keysize_bits);
                 /* Leave ivecs set to all zeroes */
                 
                 traceEvent( TRACE_DEBUG, "transop_addspec_aes sa_id=%u, %u bits data=%s.\n",
@@ -480,9 +504,9 @@ int transop_aes_init( n2n_trans_op_t * ttt )
             sa = &(priv->sa[i]);
             sa->sa_id=0;
             memset( &(sa->spec), 0, sizeof(n2n_cipherspec_t) );
-            memset( &(sa->enc_key), 0, sizeof(AES_KEY) );
+            memset( &(sa->enc_key), 0, sizeof(aes_context) );
             memset( &(sa->enc_ivec), 0, sizeof(N2N_AES_IVEC_SIZE) );
-            memset( &(sa->dec_key), 0, sizeof(AES_KEY) );
+            memset( &(sa->dec_key), 0, sizeof(aes_context) );
             memset( &(sa->dec_ivec), 0, sizeof(N2N_AES_IVEC_SIZE) );
         }
 
