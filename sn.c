@@ -1050,15 +1050,6 @@ int main( int argc, char * const argv[] )
             case 'l': /* local-port */
                 sss.lport = atoi(optarg);
                 break;
-            case 'f': /* foreground */
-                sss.daemon = 0;
-                break;
-            case 'h': /* help */
-                exit_help(argc, argv);
-                break;
-            case 'v': /* verbose */
-                ++traceLevel;
-                break;
 #ifdef N2N_MULTIPLE_SUPERNODES
             case 's':
                 sss.sn_port = atoi(optarg);
@@ -1071,6 +1062,15 @@ int main( int argc, char * const argv[] )
                 break;
             }
 #endif
+            case 'f': /* foreground */
+                sss.daemon = 0;
+                break;
+            case 'h': /* help */
+                exit_help(argc, argv);
+                break;
+            case 'v': /* verbose */
+                ++traceLevel;
+                break;
             }
         }
         
