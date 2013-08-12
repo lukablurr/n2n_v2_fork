@@ -73,10 +73,11 @@ int tuntap_open(tuntap_dev *device,
 
   device->fd = open(tuntap_device, O_RDWR);
   if(device->fd < 0) {
-    printf("ERROR: ioctl() [%s][%d]\n", strerror(errno), errno);
+    traceEvent(TRACE_ERROR, "Unable to open TUN/TAP device: ioctl() [%s][%d]\n", strerror(errno), errno);
     return -1;
   }
 
+  traceEvent(TRACE_NORMAL, "Succesfully open %s\n", tuntap_device);
   memset(&ifr, 0, sizeof(ifr));
   ifr.ifr_flags = IFF_TAP|IFF_NO_PI; /* Want a TAP device for layer 2 frames. */
   strncpy(ifr.ifr_name, dev, IFNAMSIZ);
