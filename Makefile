@@ -1,4 +1,3 @@
-
 N2N_VERSION=2.1.0
 N2N_OSNAME=$(shell uname -p)
 
@@ -50,7 +49,15 @@ MAN8DIR=$(MANDIR)/man8
 N2N_LIB=n2n.a
 N2N_OBJS=n2n.o n2n_keyfile.o wire.o minilzo.o twofish.o \
          transform_null.o transform_tf.o transform_aes.o \
-         tuntap_freebsd.o tuntap_netbsd.o tuntap_linux.o tuntap_osx.o version.o
+         tuntap_freebsd.o tuntap_netbsd.o tuntap_osx.o version.o
+
+ifneq (,$(wildcard /sbin/ip))
+N2N_OBJS+=tuntap_linux_iproute.o
+endif
+
+ifneq (, $(wildcard /sbin/ifconfig))
+N2N_OBJS+=tuntap_linux.o
+endif
 
 ifeq ($(SNM), yes)
 N2N_OBJS+=sn_multiple.o sn_multiple_wire.o 
