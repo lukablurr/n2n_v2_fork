@@ -28,6 +28,11 @@ ifeq ($(SNM), yes)
     N2N_DEFINES+="-DN2N_MULTIPLE_SUPERNODES"
 endif
 
+#Use IPRoute2
+ifneq (,$(wildcard /sbin/ip))
+    N2N_DEFINES+="-DN2N_HAVE_IPROUTE2"
+endif
+
 CFLAGS+=$(DEBUG) $(OPTIMIZATION) $(WARN) $(OPTIONS) $(PLATOPTS) $(N2N_DEFINES)
 
 INSTALL=install
