@@ -36,8 +36,8 @@ static void read_mac(char *ifname, n2n_mac_t mac_addr) {
     memcpy(mac_addr, ifr.ifr_ifru.ifru_hwaddr.sa_data, 6);
 
   traceEvent(TRACE_NORMAL, "Interface %s has MAC %s",
-	     ifname,
-	     macaddr_str(mac_addr_buf, mac_addr ));
+             ifname,
+             macaddr_str(mac_addr_buf, mac_addr ));
   close(_sock);
 }
 
@@ -46,10 +46,10 @@ static void read_mac(char *ifname, n2n_mac_t mac_addr) {
 /** @brief  Open and configure the TAP device for packet read/write.
  *
  *  This routine creates the interface via the tuntap driver then uses ifconfig
- *  to configure address/mask and MTU.
+ *  or IPRoute2 (ip) to configure address/mask and MTU.
  *
  *  @param device      - [inout] a device info holder object
- *  @param dev         - user-defined name for the new iface, 
+ *  @param dev         - user-defined name for the new iface,
  *                       if NULL system will assign a name
  *  @param device_ip   - address of iface
  *  @param device_mask - netmask for device_ip
@@ -58,13 +58,13 @@ static void read_mac(char *ifname, n2n_mac_t mac_addr) {
  *  @return - negative value on error
  *          - non-negative file-descriptor on success
  */
-int tuntap_open(tuntap_dev *device, 
+int tuntap_open(tuntap_dev *device,
                 char *dev, /* user-definable interface name, eg. edge0 */
                 const char *address_mode, /* static or dhcp */
-                char *device_ip, 
+                char *device_ip,
                 char *device_mask,
                 const char * device_mac,
-		int mtu) {
+                int mtu) {
   char *tuntap_device = "/dev/net/tun";
 #define N2N_LINUX_SYSTEMCMD_SIZE 128
   char buf[N2N_LINUX_SYSTEMCMD_SIZE];
@@ -95,24 +95,69 @@ int tuntap_open(tuntap_dev *device,
   if ( device_mac && device_mac[0] != '\0' )
   {
       /* Set the hw address before bringing the if up. */
+#ifndef N2N_HAVE_IPROUTE2
       snprintf(buf, sizeof(buf), "/sbin/ifconfig %s hw ether %s",
+#else
+      snprintf(buf, sizeof(buf), "/sbin/ip link set %s address %s",
+#endif
                ifr.ifr_name, device_mac );
       system(buf);
       traceEvent(TRACE_INFO, "Setting MAC: %s", buf);
   }
 
+#ifdef N2N_HAVE_IPROUTE2
+  snprintf(buf, sizeof(buf), "/sbin/ip link set %s mtu %d",
+           ifr.ifr_name, mtu );
+  system(buf);
+  traceEvent(TRACE_INFO, "Setting MTU: %s", buf);
+
+#endif
   if ( 0 == strncmp( "dhcp", address_mode, 5 ) )
   {
+#ifndef N2N_HAVE_IPROUTE2
       snprintf(buf, sizeof(buf), "/sbin/ifconfig %s %s mtu %d up",
                ifr.ifr_name, device_ip, mtu);
+#else
+      snprintf(buf, sizeof(buf), "/sbin/ip addr change %s dev %s",
+               device_ip, ifr.ifr_name);
+#endif
   }
   else
   {
+#ifndef N2N_HAVE_IPROUTE2
       snprintf(buf, sizeof(buf), "/sbin/ifconfig %s %s netmask %s mtu %d up",
                ifr.ifr_name, device_ip, device_mask, mtu);
+#else
+      struct in_addr host, mask, broadcast;
+      char device_broadcast[INET_ADDRSTRLEN];
+      if (inet_pton(AF_INET, device_ip, &host) == 1 &&
+          inet_pton(AF_INET, device_mask, &mask) == 1)
+                    broadcast.s_addr = host.s_addr | ~mask.s_addr;
+      else
+      {
+           traceEvent(TRACE_ERROR, "Failed calculating broadcast address. IP: %s, netmask: %s", device_ip, device_mask);
+            return -1;
+      }
+      if (inet_ntop(AF_INET, &broadcast, device_broadcast, INET_ADDRSTRLEN) != NULL)
+            printf("Broadcast address of %s with netmask %s is %s\n",
+                    device_ip, device_mask, device_broadcast);
+      else
+      {
+           traceEvent(TRACE_ERROR, "Failed converting number to string");
+            return -1;
+      }
+      snprintf(buf, sizeof(buf), "/sbin/ip addr change %s/%s dev %s broadcast %s",
+               device_ip, device_mask, ifr.ifr_name, device_broadcast);
+#endif
   }
 
   system(buf);
+#ifdef N2N_HAVE_IPROUTE2
+  traceEvent(TRACE_INFO, "Setting IP: %s", buf);
+
+  snprintf(buf, sizeof(buf), "/sbin/ip link set dev %s up", ifr.ifr_name);
+  system(buf);
+#endif
   traceEvent(TRACE_INFO, "Bringing up: %s", buf);
 
   device->ip_addr = inet_addr(device_ip);
@@ -142,11 +187,15 @@ void tuntap_get_address(struct tuntap_dev *tuntap)
     char buf[N2N_LINUX_SYSTEMCMD_SIZE];
 
     /* Would rather have a more direct way to get the inet address but a netlink
-     * socket is overkill and probably less portable than ifconfig and sed. */
+     * socket is overkill and probably less portable than ifconfig/ip and sed. */
 
     /* If the interface has no address (0.0.0.0) there will be no inet addr
      * line and the returned string will be empty. */
+#ifndef N2N_HAVE_IPROUTE2
     snprintf( buf, sizeof(buf), "/sbin/ifconfig %s | /bin/sed -e '/inet addr:/!d' -e 's/^.*inet addr://' -e 's/ .*$//'",
+#else
+    snprintf( buf, sizeof(buf), "/sbin/ip addr show dev %s | /bin/sed -e '/inet /!d' -e 's/^.*inet //' -e 's/\/.*$//'",
+#endif
               tuntap->dev_name );
     fp=popen(buf, "r");
     if (fp )
@@ -156,8 +205,11 @@ void tuntap_get_address(struct tuntap_dev *tuntap)
         fclose(fp);
         fp=NULL;
 
+#ifndef N2N_HAVE_IPROUTE2
         traceEvent(TRACE_INFO, "ifconfig address = %s", buf);
-
+#else
+        traceEvent(TRACE_INFO, "iproute2 address = %s", buf);
+#endif
         tuntap->ip_addr = inet_addr(buf);
     }
 }
