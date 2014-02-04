@@ -19,11 +19,19 @@ LIBS_EDGE_OPT=
 
 N2N_OPTION_AES?="yes"
 #N2N_OPTION_AES=no
+#If you select "no" it defaults to OpenSSL.
+#N2N_OPTION_POLARSSL="yes"
+N2N_OPTION_POLARSSL="no"
 
 ifeq ($(N2N_OPTION_AES), "yes")
     N2N_DEFINES+="-DN2N_HAVE_AES"
     LIBS_EDGE_OPT+=-lcrypto
 endif
+
+ifeq ($(N2N_OPTION_POLARSSL), "yes")
+    N2N_DEFINES+="-DN2N_HAVE_POLARSSL"
+endif
+
 
 ifeq ($(SNM), yes)
     N2N_DEFINES+="-DN2N_MULTIPLE_SUPERNODES"
